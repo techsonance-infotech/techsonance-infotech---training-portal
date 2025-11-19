@@ -2,23 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewerAssignments, reviewCycles, user, reviewNotifications } from '@/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
+import { getCurrentUser } from '@/lib/auth';
 
 const VALID_REVIEWER_TYPES = ['self', 'peer', 'client', 'manager'];
-
-async function validateAuth(request: NextRequest, requiredRoles: string[]) {
-  const userId = request.headers.get('user-id');
-  const userRole = request.headers.get('user-role');
-
-  if (!userId || !userRole) {
-    return { error: NextResponse.json({ error: 'Authentication required', code: 'AUTH_REQUIRED' }, { status: 401 }) };
-  }
-
-  if (!requiredRoles.includes(userRole)) {
-    return { error: NextResponse.json({ error: 'Insufficient permissions', code: 'INSUFFICIENT_PERMISSIONS' }, { status: 403 }) };
-  }
-
-  return { userId, userRole };
-}
 
 export async function GET(
   request: NextRequest,
@@ -27,9 +13,16 @@ export async function GET(
   try {
     const { id: cycleIdParam } = await params;
     
-    // Validate authentication - Admin and HR only
-    const auth = await validateAuth(request, ['admin', 'hr']);
-    if (auth.error) return auth.error;
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Admin and HR only
+    if (currentUser.role !== 'admin' && currentUser.role !== 'hr') {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
 
     const cycleId = parseInt(cycleIdParam);
     if (!cycleId || isNaN(cycleId)) {
@@ -113,10 +106,16 @@ export async function POST(
   try {
     const { id: cycleIdParam } = await params;
     
-    // Validate authentication - Admin only
-    const auth = await validateAuth(request, ['admin']);
-    if (auth.error) return auth.error;
-    const { userId: currentUserId } = auth;
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    }
+
+    // Admin only
+    if (currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
 
     const cycleId = parseInt(cycleIdParam);
     if (!cycleId || isNaN(cycleId)) {
@@ -231,7 +230,7 @@ export async function POST(
       employeeId: assignment.employeeId,
       reviewerId: assignment.reviewerId,
       reviewerType: assignment.reviewerType,
-      assignedBy: currentUserId,
+      assignedBy: currentUser.id,
       status: 'pending',
       notifiedAt: null,
       createdAt: now,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewCycles, reviewForms, user } from '@/db/schema';
 import { eq, and, count, avg, sql } from 'drizzle-orm';
+import { getCurrentUser } from '@/lib/auth';
 
 // GET /api/reviews/cycles/[id] - Get single cycle with details
 export async function GET(
@@ -9,23 +10,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Extract authentication from headers
-    const userId = request.headers.get('user-id');
-    const userRole = request.headers.get('user-role');
-
-    if (!userId || !userRole) {
-      return NextResponse.json(
-        { error: 'Authentication required', code: 'AUTH_REQUIRED' },
-        { status: 401 }
-      );
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Check permissions - Admin and HR only
-    if (userRole !== 'admin' && userRole !== 'hr') {
-      return NextResponse.json(
-        { error: 'Insufficient permissions', code: 'FORBIDDEN' },
-        { status: 403 }
-      );
+    if (currentUser.role !== 'admin' && currentUser.role !== 'hr') {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
     const cycleId = params.id;
@@ -121,23 +114,15 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Extract authentication from headers
-    const userId = request.headers.get('user-id');
-    const userRole = request.headers.get('user-role');
-
-    if (!userId || !userRole) {
-      return NextResponse.json(
-        { error: 'Authentication required', code: 'AUTH_REQUIRED' },
-        { status: 401 }
-      );
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Check permissions - Admin only
-    if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Admin access required', code: 'FORBIDDEN' },
-        { status: 403 }
-      );
+    if (currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const cycleId = params.id;
@@ -236,23 +221,15 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Extract authentication from headers
-    const userId = request.headers.get('user-id');
-    const userRole = request.headers.get('user-role');
-
-    if (!userId || !userRole) {
-      return NextResponse.json(
-        { error: 'Authentication required', code: 'AUTH_REQUIRED' },
-        { status: 401 }
-      );
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Check permissions - Admin only
-    if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Admin access required', code: 'FORBIDDEN' },
-        { status: 403 }
-      );
+    if (currentUser.role !== 'admin') {
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
     const cycleId = params.id;

@@ -2,28 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewComments, reviewForms, user } from '@/db/schema';
 import { eq, asc } from 'drizzle-orm';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Extract authentication headers
-    const userId = request.headers.get('user-id');
-    const userRole = request.headers.get('user-role');
-
-    // Authentication check
-    if (!userId || !userRole) {
-      return NextResponse.json(
-        { error: 'Authentication required', code: 'AUTH_REQUIRED' },
-        { status: 401 }
-      );
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Authorization check - only admin, hr, and manager roles allowed
-    if (!['admin', 'hr', 'manager'].includes(userRole)) {
+    if (!['admin', 'hr', 'manager'].includes(currentUser.role)) {
       return NextResponse.json(
-        { error: 'Access denied. Admin, HR, or manager role required.', code: 'FORBIDDEN' },
+        { error: 'Access denied. Admin, HR, or manager role required.' },
         { status: 403 }
       );
     }
@@ -83,22 +78,16 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Extract authentication headers
-    const userId = request.headers.get('user-id');
-    const userRole = request.headers.get('user-role');
-
-    // Authentication check
-    if (!userId || !userRole) {
-      return NextResponse.json(
-        { error: 'Authentication required', code: 'AUTH_REQUIRED' },
-        { status: 401 }
-      );
+    // Validate authentication
+    const currentUser = await getCurrentUser(request);
+    if (!currentUser) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     // Authorization check - only admin, hr, and manager roles allowed
-    if (!['admin', 'hr', 'manager'].includes(userRole)) {
+    if (!['admin', 'hr', 'manager'].includes(currentUser.role)) {
       return NextResponse.json(
-        { error: 'Access denied. Admin, HR, or manager role required.', code: 'FORBIDDEN' },
+        { error: 'Access denied. Admin, HR, or manager role required.' },
         { status: 403 }
       );
     }
@@ -143,8 +132,8 @@ export async function POST(
       .insert(reviewComments)
       .values({
         formId,
-        commenterId: userId,
-        commenterRole: userRole,
+        commenterId: currentUser.id,
+        commenterRole: currentUser.role,
         comment: comment.trim(),
         createdAt: new Date().toISOString(),
       })
@@ -158,7 +147,7 @@ export async function POST(
         email: user.email,
       })
       .from(user)
-      .where(eq(user.id, userId))
+      .where(eq(user.id, currentUser.id))
       .limit(1);
 
     // Combine comment with commenter details
