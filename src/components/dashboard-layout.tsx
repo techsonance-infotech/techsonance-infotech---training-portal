@@ -111,12 +111,6 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
       roles: ["admin", "hr", "employee", "intern"],
     },
     {
-      name: "Feedback",
-      href: "/feedback",
-      icon: MessageSquare,
-      roles: ["employee", "intern"],
-    },
-    {
       name: "Users",
       href: "/admin/users",
       icon: Users,

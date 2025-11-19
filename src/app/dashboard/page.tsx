@@ -368,7 +368,7 @@ export default function EmployeeDashboard() {
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card className="border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-lg hover:shadow-[#00C2FF]/20 cursor-pointer group animate-in fade-in zoom-in duration-500">
             <CardHeader>
               <div className="flex items-center space-x-3">
@@ -396,24 +396,6 @@ export default function EmployeeDashboard() {
                     <CardTitle className="text-base">My Portfolio</CardTitle>
                     <CardDescription className="text-xs">
                       Build your profile
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-            </Link>
-          </Card>
-
-          <Card className="border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-lg hover:shadow-[#00C2FF]/20 cursor-pointer group animate-in fade-in zoom-in duration-500 delay-200" asChild>
-            <Link href="/feedback">
-              <CardHeader>
-                <div className="flex items-center space-x-3">
-                  <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-3 rounded-lg group-hover:scale-110 transition-transform duration-300">
-                    <CheckCircle2 className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Peer Feedback</CardTitle>
-                    <CardDescription className="text-xs">
-                      Request reviews
                     </CardDescription>
                   </div>
                 </div>
