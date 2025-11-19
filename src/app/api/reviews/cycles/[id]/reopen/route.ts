@@ -2,17 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewCycles } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { getCurrentUser } from '@/lib/auth';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Extract user role from headers for access control
-    const userRole = request.headers.get('user-role');
-    
-    // Authentication check
-    if (!userRole) {
+    // Validate authentication
+    const authenticatedUser = await getCurrentUser(request);
+    if (!authenticatedUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'AUTH_REQUIRED' },
         { status: 401 }
@@ -20,7 +19,7 @@ export async function POST(
     }
 
     // Authorization check - admin only
-    if (userRole !== 'admin') {
+    if (authenticatedUser.role !== 'admin') {
       return NextResponse.json(
         { error: 'Admin access required', code: 'FORBIDDEN' },
         { status: 403 }

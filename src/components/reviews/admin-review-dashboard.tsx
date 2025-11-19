@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -34,20 +33,19 @@ import {
 } from "@/components/ui/table"
 import {
   Plus,
-  Calendar,
   Users,
-  FileText,
   Lock,
   Unlock,
   Trash2,
-  Edit,
-  Eye,
-  ClipboardList,
+  Download,
   CheckCircle2,
   Clock,
-  AlertCircle,
   TrendingUp,
-  Download,
+  ClipboardList,
+  Eye,
+  UserCheck,
+  FileText,
+  Calendar,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -70,8 +68,6 @@ interface ReviewStats {
   pendingForms: number
   draftForms: number
   averageRating: number | null
-  formsByType: Record<string, number>
-  formsByStatus: Record<string, number>
 }
 
 interface User {
@@ -83,12 +79,36 @@ interface User {
 
 interface Assignment {
   id: number
+  cycleId: number
   employeeId: string
   reviewerId: string
   reviewerType: string
   status: string
+  notifiedAt: string | null
+  createdAt: string
   employee: User | null
   reviewer: User | null
+}
+
+interface ReviewForm {
+  id: number
+  cycleId: number
+  employeeId: string
+  reviewerId: string
+  reviewerType: string
+  status: string
+  overallRating: number | null
+  goalsAchievement: string | null
+  strengths: string | null
+  improvements: string | null
+  kpiScores: any
+  additionalComments: string | null
+  submittedAt: string | null
+  createdAt: string
+  updatedAt: string
+  employee: User | null
+  reviewer: User | null
+  cycle: ReviewCycle | null
 }
 
 export function AdminReviewDashboard() {
@@ -96,14 +116,15 @@ export function AdminReviewDashboard() {
   const [stats, setStats] = useState<ReviewStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [reviewForms, setReviewForms] = useState<ReviewForm[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("overview")
-  const [selectedCycle, setSelectedCycle] = useState<ReviewCycle | null>(null)
+  const [activeTab, setActiveTab] = useState("assignments")
+  const [selectedForm, setSelectedForm] = useState<ReviewForm | null>(null)
   
   // Dialog states
   const [isCreateCycleOpen, setIsCreateCycleOpen] = useState(false)
   const [isAssignReviewersOpen, setIsAssignReviewersOpen] = useState(false)
-  const [isEditCycleOpen, setIsEditCycleOpen] = useState(false)
+  const [isViewFormOpen, setIsViewFormOpen] = useState(false)
   
   // Form states
   const [newCycle, setNewCycle] = useState({
@@ -132,6 +153,8 @@ export function AdminReviewDashboard() {
         fetchCycles(),
         fetchStats(),
         fetchUsers(),
+        fetchAssignments(),
+        fetchReviewForms(),
       ])
     } catch (error) {
       toast.error("Failed to load dashboard data")
@@ -144,9 +167,7 @@ export function AdminReviewDashboard() {
     try {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch("/api/reviews/cycles", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok) throw new Error("Failed to fetch cycles")
       const data = await response.json()
@@ -160,9 +181,7 @@ export function AdminReviewDashboard() {
     try {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch("/api/reviews/stats", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok) throw new Error("Failed to fetch stats")
       const data = await response.json()
@@ -176,9 +195,7 @@ export function AdminReviewDashboard() {
     try {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch("/api/users", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok) throw new Error("Failed to fetch users")
       const data = await response.json()
@@ -188,17 +205,49 @@ export function AdminReviewDashboard() {
     }
   }
 
-  const fetchAssignments = async (cycleId: number) => {
+  const fetchAssignments = async () => {
     try {
       const token = localStorage.getItem("bearer_token")
-      const response = await fetch(`/api/reviews/cycles/${cycleId}/assignments`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetch("/api/reviews/forms?limit=100", {
+        headers: { Authorization: `Bearer ${token}` },
       })
       if (!response.ok) throw new Error("Failed to fetch assignments")
       const data = await response.json()
-      setAssignments(data)
+      
+      // Group assignments with their forms
+      const assignmentMap = new Map<string, Assignment>()
+      data.forEach((form: ReviewForm) => {
+        const key = `${form.cycleId}-${form.employeeId}-${form.reviewerId}-${form.reviewerType}`
+        if (!assignmentMap.has(key)) {
+          assignmentMap.set(key, {
+            id: form.id,
+            cycleId: form.cycleId,
+            employeeId: form.employeeId,
+            reviewerId: form.reviewerId,
+            reviewerType: form.reviewerType,
+            status: form.status === 'submitted' ? 'completed' : 'pending',
+            notifiedAt: form.createdAt,
+            createdAt: form.createdAt,
+            employee: form.employee,
+            reviewer: form.reviewer,
+          })
+        }
+      })
+      setAssignments(Array.from(assignmentMap.values()))
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const fetchReviewForms = async () => {
+    try {
+      const token = localStorage.getItem("bearer_token")
+      const response = await fetch("/api/reviews/forms?limit=100", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error("Failed to fetch review forms")
+      const data = await response.json()
+      setReviewForms(data)
     } catch (error) {
       console.error(error)
     }
@@ -247,9 +296,7 @@ export function AdminReviewDashboard() {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch(`/api/reviews/cycles/${cycleId}/lock`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
@@ -269,9 +316,7 @@ export function AdminReviewDashboard() {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch(`/api/reviews/cycles/${cycleId}/reopen`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
@@ -295,9 +340,7 @@ export function AdminReviewDashboard() {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch(`/api/reviews/cycles/${cycleId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) {
@@ -319,7 +362,6 @@ export function AdminReviewDashboard() {
       return
     }
 
-    // Create assignments array
     const assignments = assignmentForm.reviewerIds.map(reviewerId => ({
       employeeId: assignmentForm.employeeId,
       reviewerId,
@@ -350,6 +392,7 @@ export function AdminReviewDashboard() {
         reviewerIds: [],
         reviewerTypes: {},
       })
+      fetchAssignments()
       fetchStats()
     } catch (error: any) {
       toast.error(error.message || "Failed to assign reviewers")
@@ -360,9 +403,7 @@ export function AdminReviewDashboard() {
     try {
       const token = localStorage.getItem("bearer_token")
       const response = await fetch(`/api/reviews/export/${cycleId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
 
       if (!response.ok) throw new Error("Failed to export cycle")
@@ -390,7 +431,19 @@ export function AdminReviewDashboard() {
       case "draft": return "bg-gray-500"
       case "locked": return "bg-orange-500"
       case "completed": return "bg-blue-500"
+      case "submitted": return "bg-green-500"
+      case "pending": return "bg-yellow-500"
       default: return "bg-gray-400"
+    }
+  }
+
+  const getReviewerTypeColor = (type: string) => {
+    switch (type) {
+      case "self": return "bg-purple-500"
+      case "peer": return "bg-blue-500"
+      case "client": return "bg-green-500"
+      case "manager": return "bg-orange-500"
+      default: return "bg-gray-500"
     }
   }
 
@@ -494,96 +547,228 @@ export function AdminReviewDashboard() {
         </Card>
       </div>
 
-      {/* Review Cycles Table */}
-      <Card className="border-[#00C2FF]/20">
-        <CardHeader>
-          <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-            Review Cycles
-          </CardTitle>
-          <CardDescription>Manage and monitor all review cycles</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {cycles.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    No review cycles found. Create one to get started.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                cycles.map((cycle) => (
-                  <TableRow key={cycle.id}>
-                    <TableCell className="font-medium">{cycle.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-[#00C2FF]/10 text-[#00C2FF]">
-                        {cycle.cycleType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(cycle.startDate).toLocaleDateString()} -{" "}
-                      {new Date(cycle.endDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${getStatusColor(cycle.status)} text-white`}>
-                        {cycle.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleExportCycle(cycle.id)}
-                          className="hover:bg-[#00C2FF]/10"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        {cycle.status === "locked" ? (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleReopenCycle(cycle.id)}
-                            className="hover:bg-[#00C2FF]/10"
-                          >
-                            <Unlock className="h-4 w-4" />
-                          </Button>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleLockCycle(cycle.id)}
-                            className="hover:bg-[#00C2FF]/10"
-                          >
-                            <Lock className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDeleteCycle(cycle.id)}
-                          className="hover:bg-red-100 text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="assignments">Assigned Reviews</TabsTrigger>
+          <TabsTrigger value="cycles">Review Cycles</TabsTrigger>
+        </TabsList>
+
+        {/* Assigned Reviews Tab */}
+        <TabsContent value="assignments" className="space-y-4">
+          <Card className="border-[#00C2FF]/20">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                Assigned Reviews with Details
+              </CardTitle>
+              <CardDescription>View all assigned reviews with responses and status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {reviewForms.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No review assignments found. Start by creating a cycle and assigning reviewers.
+                  </div>
+                ) : (
+                  reviewForms.map((form) => (
+                    <Card key={form.id} className="border-[#00C2FF]/10">
+                      <CardContent className="pt-6">
+                        <div className="grid gap-4">
+                          {/* Header Info */}
+                          <div className="flex items-start justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <UserCheck className="h-4 w-4 text-[#00C2FF]" />
+                                <span className="font-semibold">{form.reviewer?.name || "Unknown Reviewer"}</span>
+                                <Badge className={`${getReviewerTypeColor(form.reviewerType)} text-white`}>
+                                  {form.reviewerType}
+                                </Badge>
+                                <span className="text-muted-foreground">→</span>
+                                <span className="font-medium">{form.employee?.name || "Unknown Employee"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="h-3 w-3" />
+                                <span>{form.cycle?.name || `Cycle ${form.cycleId}`}</span>
+                                <span>•</span>
+                                <span>{new Date(form.createdAt).toLocaleDateString()}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={`${getStatusColor(form.status)} text-white`}>
+                                {form.status}
+                              </Badge>
+                              {form.status === 'submitted' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedForm(form)
+                                    setIsViewFormOpen(true)
+                                  }}
+                                  className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View Details
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Review Details (if submitted) */}
+                          {form.status === 'submitted' && (
+                            <div className="grid gap-3 pt-3 border-t border-[#00C2FF]/10">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <span className="text-sm font-medium text-muted-foreground">Overall Rating:</span>
+                                  <div className="flex items-center gap-1 mt-1">
+                                    {form.overallRating ? (
+                                      <>
+                                        <span className="text-2xl font-bold text-[#00C2FF]">{form.overallRating}</span>
+                                        <span className="text-sm text-muted-foreground">/5</span>
+                                      </>
+                                    ) : (
+                                      <span className="text-muted-foreground">Not rated</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div>
+                                  <span className="text-sm font-medium text-muted-foreground">Submitted:</span>
+                                  <div className="mt-1">
+                                    <span className="text-sm">{form.submittedAt ? new Date(form.submittedAt).toLocaleString() : "N/A"}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {form.strengths && (
+                                <div>
+                                  <span className="text-sm font-medium text-muted-foreground">Strengths:</span>
+                                  <p className="text-sm mt-1 line-clamp-2">{form.strengths}</p>
+                                </div>
+                              )}
+                              
+                              {form.improvements && (
+                                <div>
+                                  <span className="text-sm font-medium text-muted-foreground">Areas for Improvement:</span>
+                                  <p className="text-sm mt-1 line-clamp-2">{form.improvements}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {form.status === 'draft' && (
+                            <div className="text-sm text-muted-foreground pt-3 border-t border-[#00C2FF]/10">
+                              Review is in draft status. Last updated: {new Date(form.updatedAt).toLocaleString()}
+                            </div>
+                          )}
+
+                          {form.status === 'pending' && (
+                            <div className="text-sm text-muted-foreground pt-3 border-t border-[#00C2FF]/10">
+                              Awaiting review submission from {form.reviewer?.name}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Review Cycles Tab */}
+        <TabsContent value="cycles">
+          <Card className="border-[#00C2FF]/20">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                Review Cycles
+              </CardTitle>
+              <CardDescription>Manage and monitor all review cycles</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {cycles.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        No review cycles found. Create one to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    cycles.map((cycle) => (
+                      <TableRow key={cycle.id}>
+                        <TableCell className="font-medium">{cycle.name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-[#00C2FF]/10 text-[#00C2FF]">
+                            {cycle.cycleType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(cycle.startDate).toLocaleDateString()} -{" "}
+                          {new Date(cycle.endDate).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={`${getStatusColor(cycle.status)} text-white`}>
+                            {cycle.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleExportCycle(cycle.id)}
+                              className="hover:bg-[#00C2FF]/10"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            {cycle.status === "locked" ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleReopenCycle(cycle.id)}
+                                className="hover:bg-[#00C2FF]/10"
+                              >
+                                <Unlock className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleLockCycle(cycle.id)}
+                                className="hover:bg-[#00C2FF]/10"
+                              >
+                                <Lock className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteCycle(cycle.id)}
+                              className="hover:bg-red-100 text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Create Cycle Dialog */}
       <Dialog open={isCreateCycleOpen} onOpenChange={setIsCreateCycleOpen}>
@@ -807,6 +992,107 @@ export function AdminReviewDashboard() {
               className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white"
             >
               Assign Reviewers
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Form Details Dialog */}
+      <Dialog open={isViewFormOpen} onOpenChange={setIsViewFormOpen}>
+        <DialogContent className="border-[#00C2FF]/20 max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+              Review Details
+            </DialogTitle>
+            <DialogDescription>
+              Complete review response from {selectedForm?.reviewer?.name}
+            </DialogDescription>
+          </DialogHeader>
+          {selectedForm && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Reviewer:</span>
+                  <p className="font-semibold">{selectedForm.reviewer?.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedForm.reviewer?.email}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Employee:</span>
+                  <p className="font-semibold">{selectedForm.employee?.name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedForm.employee?.email}</p>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Review Type:</span>
+                  <div className="mt-1">
+                    <Badge className={`${getReviewerTypeColor(selectedForm.reviewerType)} text-white`}>
+                      {selectedForm.reviewerType}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-muted-foreground">Overall Rating:</span>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className="text-2xl font-bold text-[#00C2FF]">{selectedForm.overallRating || "N/A"}</span>
+                    {selectedForm.overallRating && <span className="text-sm text-muted-foreground">/5</span>}
+                  </div>
+                </div>
+              </div>
+
+              {selectedForm.kpiScores && (
+                <div>
+                  <h3 className="font-semibold mb-3">KPI Scores</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {Object.entries(JSON.parse(selectedForm.kpiScores as any)).map(([key, value]) => (
+                      <div key={key} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                        <span className="text-sm font-medium">{key}</span>
+                        <span className="text-lg font-bold text-[#00C2FF]">{value as number}/5</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedForm.goalsAchievement && (
+                <div>
+                  <h3 className="font-semibold mb-2">Goals Achievement</h3>
+                  <p className="text-sm p-3 bg-muted/50 rounded-lg">{selectedForm.goalsAchievement}</p>
+                </div>
+              )}
+
+              {selectedForm.strengths && (
+                <div>
+                  <h3 className="font-semibold mb-2">Strengths</h3>
+                  <p className="text-sm p-3 bg-muted/50 rounded-lg">{selectedForm.strengths}</p>
+                </div>
+              )}
+
+              {selectedForm.improvements && (
+                <div>
+                  <h3 className="font-semibold mb-2">Areas for Improvement</h3>
+                  <p className="text-sm p-3 bg-muted/50 rounded-lg">{selectedForm.improvements}</p>
+                </div>
+              )}
+
+              {selectedForm.additionalComments && (
+                <div>
+                  <h3 className="font-semibold mb-2">Additional Comments</h3>
+                  <p className="text-sm p-3 bg-muted/50 rounded-lg">{selectedForm.additionalComments}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between text-sm text-muted-foreground pt-4 border-t">
+                <span>Submitted: {selectedForm.submittedAt ? new Date(selectedForm.submittedAt).toLocaleString() : "N/A"}</span>
+                <span>Cycle: {selectedForm.cycle?.name || `Cycle ${selectedForm.cycleId}`}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsViewFormOpen(false)}
+              className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
