@@ -25,6 +25,7 @@ import {
   Calendar,
   TrendingUp,
   Bell,
+  User,
 } from "lucide-react"
 import { toast } from "sonner"
 import { ReviewFormComponent } from "./review-form-component"
@@ -64,6 +65,7 @@ interface Notification {
   message: string
   isRead: boolean
   createdAt: string
+  relatedId?: string
 }
 
 export function EmployeeReviewDashboard() {
@@ -77,6 +79,7 @@ export function EmployeeReviewDashboard() {
   const [selectedReview, setSelectedReview] = useState<ReviewForm | null>(null)
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
+  const [employeeDetails, setEmployeeDetails] = useState<any>(null)
 
   useEffect(() => {
     if (session?.user) {
@@ -151,7 +154,7 @@ export function EmployeeReviewDashboard() {
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem("bearer_token")
-      const response = await fetch("/api/reviews/notifications?isRead=false&limit=5", {
+      const response = await fetch("/api/reviews/notifications?isRead=false&limit=10", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -159,6 +162,22 @@ export function EmployeeReviewDashboard() {
       if (!response.ok) throw new Error("Failed to fetch notifications")
       const data = await response.json()
       setNotifications(data)
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const fetchEmployeeDetails = async (employeeId: string) => {
+    try {
+      const token = localStorage.getItem("bearer_token")
+      const response = await fetch(`/api/users/${employeeId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      if (!response.ok) throw new Error("Failed to fetch employee details")
+      const data = await response.json()
+      setEmployeeDetails(data)
     } catch (error) {
       console.error(error)
     }
@@ -179,12 +198,67 @@ export function EmployeeReviewDashboard() {
     }
   }
 
+  const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read
+    await handleMarkNotificationRead(notification.id)
+
+    // Find the related review form
+    if (notification.relatedId && notification.notificationType === 'review_requested') {
+      const review = myReviews.find(r => r.id === notification.relatedId || 
+        (r.employeeId === notification.relatedId && r.reviewerId === session?.user?.id))
+      
+      if (review) {
+        // Fetch employee details before opening the form
+        await fetchEmployeeDetails(review.employeeId)
+        setSelectedReview(review)
+        setIsReviewDialogOpen(true)
+      } else {
+        // Fetch the review if not in the list
+        try {
+          const token = localStorage.getItem("bearer_token")
+          const response = await fetch(`/api/reviews/forms?reviewerId=${session?.user?.id}&limit=100`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          if (response.ok) {
+            const data = await response.json()
+            const foundReview = data.find((r: ReviewForm) => r.id === notification.relatedId)
+            if (foundReview) {
+              await fetchEmployeeDetails(foundReview.employeeId)
+              setSelectedReview(foundReview)
+              setIsReviewDialogOpen(true)
+              await fetchData() // Refresh all data
+            }
+          }
+        } catch (error) {
+          console.error(error)
+          toast.error("Could not find the review form")
+        }
+      }
+    }
+  }
+
+  const handleStartReview = async (review: ReviewForm) => {
+    await fetchEmployeeDetails(review.employeeId)
+    setSelectedReview(review)
+    setIsReviewDialogOpen(true)
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "submitted": return "bg-green-500"
       case "draft": return "bg-gray-500"
       case "pending": return "bg-yellow-500"
       default: return "bg-gray-400"
+    }
+  }
+
+  const getReviewerTypeColor = (type: string) => {
+    switch (type) {
+      case "self": return "bg-purple-500"
+      case "peer": return "bg-blue-500"
+      case "client": return "bg-green-500"
+      case "manager": return "bg-orange-500"
+      default: return "bg-gray-500"
     }
   }
 
@@ -198,6 +272,8 @@ export function EmployeeReviewDashboard() {
 
   const pendingReviews = myReviews.filter(r => r.status === "pending" || r.status === "draft")
   const completedReviews = myReviews.filter(r => r.status === "submitted")
+  const selfReviews = reviewsAboutMe.filter(r => r.reviewerType === "self")
+  const peerClientReviews = reviewsAboutMe.filter(r => r.reviewerType !== "self")
 
   return (
     <div className="space-y-6">
@@ -224,7 +300,8 @@ export function EmployeeReviewDashboard() {
             {notifications.map((notification) => (
               <div
                 key={notification.id}
-                className="flex items-start justify-between p-3 rounded-lg border border-[#00C2FF]/20 bg-background hover:bg-[#00C2FF]/5 transition-colors"
+                className="flex items-start justify-between p-3 rounded-lg border border-[#00C2FF]/20 bg-background hover:bg-[#00C2FF]/5 transition-colors cursor-pointer"
+                onClick={() => handleNotificationClick(notification)}
               >
                 <div className="flex-1">
                   <p className="font-medium text-sm">{notification.title}</p>
@@ -232,11 +309,28 @@ export function EmployeeReviewDashboard() {
                   <p className="text-xs text-muted-foreground mt-1">
                     {new Date(notification.createdAt).toLocaleString()}
                   </p>
+                  {notification.notificationType === 'review_requested' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleNotificationClick(notification)
+                      }}
+                    >
+                      <Edit className="h-3 w-3 mr-1" />
+                      Fill Review Form
+                    </Button>
+                  )}
                 </div>
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => handleMarkNotificationRead(notification.id)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleMarkNotificationRead(notification.id)
+                  }}
                   className="hover:bg-[#00C2FF]/10"
                 >
                   Mark Read
@@ -360,13 +454,19 @@ export function EmployeeReviewDashboard() {
                             <Badge className={`${getStatusColor(review.status)} text-white capitalize`}>
                               {review.status}
                             </Badge>
-                            <Badge variant="outline" className="bg-[#00C2FF]/10 text-[#00C2FF] capitalize">
+                            <Badge variant="outline" className={`${getReviewerTypeColor(review.reviewerType)} text-white capitalize`}>
                               {review.reviewerType}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">
                             Cycle: {review.cycle?.name || "N/A"}
                           </p>
+                          {review.employee && (
+                            <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                              <User className="h-3 w-3" />
+                              <span>Employee: {review.employee.email}</span>
+                            </div>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
                             <Calendar className="h-3 w-3 inline mr-1" />
                             Due: {review.cycle?.endDate ? new Date(review.cycle.endDate).toLocaleDateString() : "N/A"}
@@ -374,10 +474,7 @@ export function EmployeeReviewDashboard() {
                         </div>
                       </div>
                       <Button
-                        onClick={() => {
-                          setSelectedReview(review)
-                          setIsReviewDialogOpen(true)
-                        }}
+                        onClick={() => handleStartReview(review)}
                         className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white"
                       >
                         <Edit className="h-4 w-4 mr-2" />
@@ -428,10 +525,14 @@ export function EmployeeReviewDashboard() {
                                 : `Review for ${review.employee?.name || "Employee"}`}
                             </h4>
                             <Badge className="bg-green-500 text-white">Submitted</Badge>
+                            <Badge variant="outline" className={`${getReviewerTypeColor(review.reviewerType)} text-white`}>
+                              {review.reviewerType}
+                            </Badge>
                             {review.overallRating && (
-                              <span className="text-sm text-yellow-500">
-                                ⭐ {review.overallRating}/5
-                              </span>
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-bold text-[#00C2FF]">{review.overallRating}/5</span>
+                              </div>
                             )}
                           </div>
                           <p className="text-sm text-muted-foreground">
@@ -464,73 +565,137 @@ export function EmployeeReviewDashboard() {
 
         {/* Reviews About Me */}
         <TabsContent value="about-me">
-          <Card className="border-[#00C2FF]/20">
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-                Reviews About Me
-              </CardTitle>
-              <CardDescription>Feedback received from peers and managers</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {reviewsAboutMe.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <Star className="h-16 w-16 mx-auto mb-4 text-[#00C2FF] opacity-50" />
-                  <h3 className="text-lg font-semibold mb-2 bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-                    No reviews yet
-                  </h3>
-                  <p>Reviews from your peers will appear here</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {reviewsAboutMe.map((review) => (
-                    <div
-                      key={review.id}
-                      className="flex items-start justify-between p-4 rounded-lg border border-[#00C2FF]/20 bg-gradient-to-r from-transparent via-[#00C2FF]/5 to-transparent"
-                    >
-                      <div className="flex items-start gap-3 flex-1">
-                        <div className="bg-blue-500/10 text-blue-500 p-2 rounded-lg border border-blue-500/30">
-                          <Star className="h-5 w-5" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold">
-                              From: {review.reviewer?.name || "Anonymous"}
-                            </h4>
-                            <Badge variant="outline" className="bg-[#00C2FF]/10 text-[#00C2FF] capitalize">
-                              {review.reviewerType}
-                            </Badge>
-                            {review.overallRating && (
-                              <span className="text-sm text-yellow-500 font-medium">
-                                ⭐ {review.overallRating}/5
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Cycle: {review.cycle?.name || "N/A"}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Submitted: {review.submittedAt ? new Date(review.submittedAt).toLocaleDateString() : "N/A"}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedReview(review)
-                          setIsViewDialogOpen(true)
-                        }}
-                        className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+          <div className="space-y-4">
+            {/* Self Reviews Section */}
+            <Card className="border-[#00C2FF]/20">
+              <CardHeader>
+                <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                  My Self Reviews
+                </CardTitle>
+                <CardDescription>Self-assessments you've submitted</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {selfReviews.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Star className="h-12 w-12 mx-auto mb-3 text-[#00C2FF] opacity-50" />
+                    <p>No self reviews yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {selfReviews.map((review) => (
+                      <div
+                        key={review.id}
+                        className="flex items-start justify-between p-4 rounded-lg border border-purple-500/20 bg-gradient-to-r from-transparent via-purple-500/5 to-transparent"
                       >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="bg-purple-500/10 text-purple-500 p-2 rounded-lg border border-purple-500/30">
+                            <Star className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold">Self Review</h4>
+                              <Badge className="bg-purple-500 text-white">Self</Badge>
+                              {review.overallRating && (
+                                <div className="flex items-center gap-1">
+                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-sm font-bold text-[#00C2FF]">{review.overallRating}/5</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Cycle: {review.cycle?.name || "N/A"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Submitted: {review.submittedAt ? new Date(review.submittedAt).toLocaleDateString() : "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedReview(review)
+                            setIsViewDialogOpen(true)
+                          }}
+                          className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Peer & Client Reviews Section */}
+            <Card className="border-[#00C2FF]/20">
+              <CardHeader>
+                <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                  Peer, Client & Manager Reviews
+                </CardTitle>
+                <CardDescription>Feedback received from others</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {peerClientReviews.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Star className="h-12 w-12 mx-auto mb-3 text-[#00C2FF] opacity-50" />
+                    <p>No peer or client reviews yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {peerClientReviews.map((review) => (
+                      <div
+                        key={review.id}
+                        className="flex items-start justify-between p-4 rounded-lg border border-[#00C2FF]/20 bg-gradient-to-r from-transparent via-[#00C2FF]/5 to-transparent"
+                      >
+                        <div className="flex items-start gap-3 flex-1">
+                          <div className="bg-blue-500/10 text-blue-500 p-2 rounded-lg border border-blue-500/30">
+                            <Star className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-semibold">
+                                From: {review.reviewer?.name || "Anonymous"}
+                              </h4>
+                              <Badge variant="outline" className={`${getReviewerTypeColor(review.reviewerType)} text-white capitalize`}>
+                                {review.reviewerType}
+                              </Badge>
+                              {review.overallRating && (
+                                <div className="flex items-center gap-1">
+                                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                  <span className="text-sm font-bold text-[#00C2FF]">{review.overallRating}/5</span>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Cycle: {review.cycle?.name || "N/A"}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Submitted: {review.submittedAt ? new Date(review.submittedAt).toLocaleDateString() : "N/A"}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedReview(review)
+                            setIsViewDialogOpen(true)
+                          }}
+                          className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
@@ -538,27 +703,58 @@ export function EmployeeReviewDashboard() {
       <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-[#00C2FF]/20">
           {selectedReview && (
-            <ReviewFormComponent
-              cycleId={selectedReview.cycleId}
-              employeeId={selectedReview.employeeId}
-              employeeName={selectedReview.employee?.name || "Employee"}
-              reviewerId={selectedReview.reviewerId}
-              reviewerType={selectedReview.reviewerType as any}
-              existingFormId={selectedReview.id}
-              existingData={{
-                overallRating: selectedReview.overallRating || undefined,
-                goalsAchievement: selectedReview.goalsAchievement || undefined,
-                strengths: selectedReview.strengths || undefined,
-                improvements: selectedReview.improvements || undefined,
-                kpiScores: selectedReview.kpiScores ? JSON.parse(selectedReview.kpiScores) : undefined,
-                additionalComments: selectedReview.additionalComments || undefined,
-              }}
-              onSuccess={() => {
-                setIsReviewDialogOpen(false)
-                fetchData()
-              }}
-              onCancel={() => setIsReviewDialogOpen(false)}
-            />
+            <>
+              <DialogHeader>
+                <DialogTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                  {selectedReview.reviewerType === "self" ? "Self Review" : `Review for ${selectedReview.employee?.name || "Employee"}`}
+                </DialogTitle>
+                <DialogDescription>
+                  {employeeDetails && (
+                    <div className="mt-2 p-3 bg-muted/50 rounded-lg">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="font-medium">Name:</span> {employeeDetails.name}
+                        </div>
+                        <div>
+                          <span className="font-medium">Email:</span> {employeeDetails.email}
+                        </div>
+                        <div>
+                          <span className="font-medium">Role:</span> {employeeDetails.role}
+                        </div>
+                        <div>
+                          <span className="font-medium">Cycle:</span> {selectedReview.cycle?.name || "N/A"}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              <ReviewFormComponent
+                cycleId={selectedReview.cycleId}
+                employeeId={selectedReview.employeeId}
+                employeeName={selectedReview.employee?.name || "Employee"}
+                reviewerId={selectedReview.reviewerId}
+                reviewerType={selectedReview.reviewerType as any}
+                existingFormId={selectedReview.id}
+                existingData={{
+                  overallRating: selectedReview.overallRating || undefined,
+                  goalsAchievement: selectedReview.goalsAchievement || undefined,
+                  strengths: selectedReview.strengths || undefined,
+                  improvements: selectedReview.improvements || undefined,
+                  kpiScores: selectedReview.kpiScores ? JSON.parse(selectedReview.kpiScores) : undefined,
+                  additionalComments: selectedReview.additionalComments || undefined,
+                }}
+                onSuccess={() => {
+                  setIsReviewDialogOpen(false)
+                  setEmployeeDetails(null)
+                  fetchData()
+                }}
+                onCancel={() => {
+                  setIsReviewDialogOpen(false)
+                  setEmployeeDetails(null)
+                }}
+              />
+            </>
           )}
         </DialogContent>
       </Dialog>

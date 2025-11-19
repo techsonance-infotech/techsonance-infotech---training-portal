@@ -46,6 +46,7 @@ import {
   UserCheck,
   FileText,
   Calendar,
+  Star,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -118,7 +119,7 @@ export function AdminReviewDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [reviewForms, setReviewForms] = useState<ReviewForm[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState("assignments")
+  const [activeTab, setActiveTab] = useState("overview")
   const [selectedForm, setSelectedForm] = useState<ReviewForm | null>(null)
   
   // Dialog states
@@ -455,6 +456,11 @@ export function AdminReviewDashboard() {
     )
   }
 
+  // Filter reviews by status
+  const submittedReviews = reviewForms.filter(r => r.status === 'submitted')
+  const pendingReviews = reviewForms.filter(r => r.status === 'pending')
+  const completedReviews = reviewForms.filter(r => r.status === 'submitted' && r.cycle?.status === 'completed')
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -549,19 +555,22 @@ export function AdminReviewDashboard() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="assignments">Assigned Reviews</TabsTrigger>
-          <TabsTrigger value="cycles">Review Cycles</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="submitted">Submitted</TabsTrigger>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsTrigger value="cycles">Cycles</TabsTrigger>
         </TabsList>
 
-        {/* Assigned Reviews Tab */}
-        <TabsContent value="assignments" className="space-y-4">
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4">
           <Card className="border-[#00C2FF]/20">
             <CardHeader>
               <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
                 Assigned Reviews with Details
               </CardTitle>
-              <CardDescription>View all assigned reviews with responses and status</CardDescription>
+              <CardDescription>Complete view of all assigned reviews and their responses</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -623,8 +632,19 @@ export function AdminReviewDashboard() {
                                   <div className="flex items-center gap-1 mt-1">
                                     {form.overallRating ? (
                                       <>
-                                        <span className="text-2xl font-bold text-[#00C2FF]">{form.overallRating}</span>
-                                        <span className="text-sm text-muted-foreground">/5</span>
+                                        <div className="flex items-center gap-1">
+                                          {[1, 2, 3, 4, 5].map((star) => (
+                                            <Star
+                                              key={star}
+                                              className={`h-4 w-4 ${
+                                                star <= form.overallRating!
+                                                  ? "fill-yellow-400 text-yellow-400"
+                                                  : "text-gray-300"
+                                              }`}
+                                            />
+                                          ))}
+                                        </div>
+                                        <span className="text-lg font-bold text-[#00C2FF] ml-2">{form.overallRating}/5</span>
                                       </>
                                     ) : (
                                       <span className="text-muted-foreground">Not rated</span>
@@ -669,6 +689,175 @@ export function AdminReviewDashboard() {
                         </div>
                       </CardContent>
                     </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Submitted Reviews Tab */}
+        <TabsContent value="submitted">
+          <Card className="border-[#00C2FF]/20">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                Submitted Reviews
+              </CardTitle>
+              <CardDescription>All completed and submitted review forms</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {submittedReviews.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No submitted reviews yet.
+                  </div>
+                ) : (
+                  submittedReviews.map((form) => (
+                    <div key={form.id} className="flex items-center justify-between p-4 rounded-lg border border-[#00C2FF]/20 bg-gradient-to-r from-transparent via-[#00C2FF]/5 to-transparent">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="bg-green-500/10 text-green-500 p-2 rounded-lg border border-green-500/30">
+                          <CheckCircle2 className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{form.reviewer?.name}</span>
+                            <Badge className={`${getReviewerTypeColor(form.reviewerType)} text-white text-xs`}>
+                              {form.reviewerType}
+                            </Badge>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium">{form.employee?.name}</span>
+                            {form.overallRating && (
+                              <div className="flex items-center gap-1 ml-2">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-bold text-[#00C2FF]">{form.overallRating}/5</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {form.cycle?.name} • Submitted {new Date(form.submittedAt!).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedForm(form)
+                          setIsViewFormOpen(true)
+                        }}
+                        className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Pending Reviews Tab */}
+        <TabsContent value="pending">
+          <Card className="border-[#00C2FF]/20">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                Pending Reviews
+              </CardTitle>
+              <CardDescription>Reviews awaiting completion</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {pendingReviews.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No pending reviews.
+                  </div>
+                ) : (
+                  pendingReviews.map((form) => (
+                    <div key={form.id} className="flex items-center justify-between p-4 rounded-lg border border-[#00C2FF]/20 bg-gradient-to-r from-transparent via-yellow-500/5 to-transparent">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="bg-yellow-500/10 text-yellow-500 p-2 rounded-lg border border-yellow-500/30">
+                          <Clock className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{form.reviewer?.name}</span>
+                            <Badge className={`${getReviewerTypeColor(form.reviewerType)} text-white text-xs`}>
+                              {form.reviewerType}
+                            </Badge>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium">{form.employee?.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {form.cycle?.name} • Assigned {new Date(form.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge className="bg-yellow-500 text-white">Pending</Badge>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Completed Reviews Tab */}
+        <TabsContent value="completed">
+          <Card className="border-[#00C2FF]/20">
+            <CardHeader>
+              <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                Completed Reviews
+              </CardTitle>
+              <CardDescription>Reviews in completed appraisal cycles</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {completedReviews.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    No completed reviews yet. Reviews appear here when their cycle is marked as completed.
+                  </div>
+                ) : (
+                  completedReviews.map((form) => (
+                    <div key={form.id} className="flex items-center justify-between p-4 rounded-lg border border-[#00C2FF]/20 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent">
+                      <div className="flex items-start gap-3 flex-1">
+                        <div className="bg-blue-500/10 text-blue-500 p-2 rounded-lg border border-blue-500/30">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold">{form.reviewer?.name}</span>
+                            <Badge className={`${getReviewerTypeColor(form.reviewerType)} text-white text-xs`}>
+                              {form.reviewerType}
+                            </Badge>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="font-medium">{form.employee?.name}</span>
+                            {form.overallRating && (
+                              <div className="flex items-center gap-1 ml-2">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-bold text-[#00C2FF]">{form.overallRating}/5</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {form.cycle?.name} • Completed Cycle
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedForm(form)
+                          setIsViewFormOpen(true)
+                        }}
+                        className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                    </div>
                   ))
                 )}
               </div>
