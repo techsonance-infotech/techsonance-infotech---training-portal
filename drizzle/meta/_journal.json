@@ -15,6 +15,13 @@
       "when": 1763439490481,
       "tag": "0001_absent_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1763534204943,
+      "tag": "0002_sparkling_mandroid",
+      "breakpoints": true
     }
   ]
 }

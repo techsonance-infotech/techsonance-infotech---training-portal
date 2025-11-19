@@ -115,6 +115,72 @@ export const feedbackResponses = sqliteTable('feedback_responses', {
   submittedAt: text('submitted_at').notNull(),
 });
 
+// Review cycles table
+export const reviewCycles = sqliteTable('review_cycles', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  cycleType: text('cycle_type').notNull(), // "6-month" or "1-year"
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  status: text('status').notNull().default('draft'), // "draft", "active", "locked", "completed"
+  createdBy: text('created_by').references(() => user.id),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// Review forms table
+export const reviewForms = sqliteTable('review_forms', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  cycleId: integer('cycle_id').references(() => reviewCycles.id),
+  employeeId: text('employee_id').references(() => user.id),
+  reviewerId: text('reviewer_id').references(() => user.id),
+  reviewerType: text('reviewer_type').notNull(), // "self", "peer", "client", "manager"
+  status: text('status').notNull().default('pending'), // "pending", "draft", "submitted", "approved"
+  overallRating: integer('overall_rating'),
+  goalsAchievement: text('goals_achievement'),
+  strengths: text('strengths'),
+  improvements: text('improvements'),
+  kpiScores: text('kpi_scores', { mode: 'json' }),
+  additionalComments: text('additional_comments'),
+  submittedAt: text('submitted_at'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+// Reviewer assignments table
+export const reviewerAssignments = sqliteTable('reviewer_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  cycleId: integer('cycle_id').references(() => reviewCycles.id),
+  employeeId: text('employee_id').references(() => user.id),
+  reviewerId: text('reviewer_id').references(() => user.id),
+  reviewerType: text('reviewer_type').notNull(), // "self", "peer", "client", "manager"
+  assignedBy: text('assigned_by').references(() => user.id),
+  status: text('status').notNull().default('pending'), // "pending", "completed", "overdue"
+  notifiedAt: text('notified_at'),
+  createdAt: text('created_at').notNull(),
+});
+
+// Review comments table
+export const reviewComments = sqliteTable('review_comments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  formId: integer('form_id').references(() => reviewForms.id),
+  commenterId: text('commenter_id').references(() => user.id),
+  commenterRole: text('commenter_role').notNull(), // "admin", "hr", "manager"
+  comment: text('comment').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+// Review notifications table
+export const reviewNotifications = sqliteTable('review_notifications', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: text('user_id').references(() => user.id),
+  notificationType: text('notification_type').notNull(), // "review_requested", "review_submitted", "draft_saved", "cycle_completed", "reminder"
+  title: text('title').notNull(),
+  message: text('message').notNull(),
+  relatedId: integer('related_id'),
+  isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
+  createdAt: text('created_at').notNull(),
+});
 
 // Auth tables for better-auth
 export const user = sqliteTable("user", {
