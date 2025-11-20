@@ -1231,12 +1231,26 @@ export function AdminReviewDashboard() {
                 <div>
                   <h3 className="font-semibold mb-3">KPI Scores</h3>
                   <div className="grid grid-cols-2 gap-3">
-                    {Object.entries(JSON.parse(selectedForm.kpiScores as any)).map(([key, value]) => (
-                      <div key={key} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                        <span className="text-sm font-medium">{key}</span>
-                        <span className="text-lg font-bold text-[#00C2FF]">{value as number}/5</span>
-                      </div>
-                    ))}
+                    {(() => {
+                      try {
+                        const scores = typeof selectedForm.kpiScores === 'string' 
+                          ? JSON.parse(selectedForm.kpiScores) 
+                          : selectedForm.kpiScores;
+                        
+                        if (Array.isArray(scores)) {
+                          return scores.map((kpi: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                              <span className="text-sm font-medium">{kpi.name || `KPI ${index + 1}`}</span>
+                              <span className="text-lg font-bold text-[#00C2FF]">{kpi.score || 0}/5</span>
+                            </div>
+                          ));
+                        }
+                        
+                        return <div className="text-sm text-muted-foreground">No KPI scores available</div>;
+                      } catch (e) {
+                        return <div className="text-sm text-muted-foreground">Unable to load KPI scores</div>;
+                      }
+                    })()}
                   </div>
                 </div>
               )}
