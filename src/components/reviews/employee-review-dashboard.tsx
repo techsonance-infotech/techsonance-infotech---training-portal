@@ -77,9 +77,7 @@ export function EmployeeReviewDashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedReview, setSelectedReview] = useState<ReviewForm | null>(null)
-  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
-  const [employeeDetails, setEmployeeDetails] = useState<any>(null)
 
   useEffect(() => {
     if (session?.user) {
@@ -167,22 +165,6 @@ export function EmployeeReviewDashboard() {
     }
   }
 
-  const fetchEmployeeDetails = async (employeeId: string) => {
-    try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch(`/api/users/${employeeId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch employee details")
-      const data = await response.json()
-      setEmployeeDetails(data)
-    } catch (error) {
-      console.error(error)
-    }
-  }
-
   const handleMarkNotificationRead = async (notificationId: number) => {
     try {
       const token = localStorage.getItem("bearer_token")
@@ -202,45 +184,17 @@ export function EmployeeReviewDashboard() {
     // Mark as read
     await handleMarkNotificationRead(notification.id)
 
-    // Find the related review form
-    if (notification.relatedId && notification.notificationType === 'review_requested') {
-      const review = myReviews.find(r => r.id === notification.relatedId || 
-        (r.employeeId === notification.relatedId && r.reviewerId === session?.user?.id))
-      
-      if (review) {
-        // Fetch employee details before opening the form
-        await fetchEmployeeDetails(review.employeeId)
-        setSelectedReview(review)
-        setIsReviewDialogOpen(true)
-      } else {
-        // Fetch the review if not in the list
-        try {
-          const token = localStorage.getItem("bearer_token")
-          const response = await fetch(`/api/reviews/forms?reviewerId=${session?.user?.id}&limit=100`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          if (response.ok) {
-            const data = await response.json()
-            const foundReview = data.find((r: ReviewForm) => r.id === notification.relatedId)
-            if (foundReview) {
-              await fetchEmployeeDetails(foundReview.employeeId)
-              setSelectedReview(foundReview)
-              setIsReviewDialogOpen(true)
-              await fetchData() // Refresh all data
-            }
-          }
-        } catch (error) {
-          console.error(error)
-          toast.error("Could not find the review form")
-        }
-      }
+    // Navigate to review form page if it's a review request
+    if (notification.notificationType === 'review_requested' && notification.relatedId) {
+      router.push(`/reviews/form/${notification.relatedId}`)
+    } else if (notification.relatedId) {
+      // For other notification types, try to find and navigate to the form
+      router.push(`/reviews/form/${notification.relatedId}`)
     }
   }
 
-  const handleStartReview = async (review: ReviewForm) => {
-    await fetchEmployeeDetails(review.employeeId)
-    setSelectedReview(review)
-    setIsReviewDialogOpen(true)
+  const handleStartReview = (review: ReviewForm) => {
+    router.push(`/reviews/form/${review.id}`)
   }
 
   const getStatusColor = (status: string) => {
@@ -350,7 +304,7 @@ export function EmployeeReviewDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-              {stats?.myPendingReviews || 0}
+              {pendingReviews.length}
             </div>
             <p className="text-xs text-muted-foreground">To complete</p>
           </CardContent>
@@ -363,7 +317,7 @@ export function EmployeeReviewDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-              {stats?.myCompletedReviews || 0}
+              {completedReviews.length}
             </div>
             <p className="text-xs text-muted-foreground">Reviews done</p>
           </CardContent>
@@ -376,7 +330,7 @@ export function EmployeeReviewDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-              {stats?.reviewsAboutMe || 0}
+              {reviewsAboutMe.length}
             </div>
             <p className="text-xs text-muted-foreground">Received</p>
           </CardContent>
@@ -547,8 +501,7 @@ export function EmployeeReviewDashboard() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setSelectedReview(review)
-                          setIsViewDialogOpen(true)
+                          router.push(`/reviews/form/${review.id}`)
                         }}
                         className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
                       >
@@ -614,8 +567,7 @@ export function EmployeeReviewDashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSelectedReview(review)
-                            setIsViewDialogOpen(true)
+                            router.push(`/reviews/form/${review.id}`)
                           }}
                           className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
                         >
@@ -681,8 +633,7 @@ export function EmployeeReviewDashboard() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            setSelectedReview(review)
-                            setIsViewDialogOpen(true)
+                            router.push(`/reviews/form/${review.id}`)
                           }}
                           className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
                         >
@@ -698,92 +649,6 @@ export function EmployeeReviewDashboard() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Review Form Dialog */}
-      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-[#00C2FF]/20">
-          {selectedReview && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-                  {selectedReview.reviewerType === "self" ? "Self Review" : `Review for ${selectedReview.employee?.name || "Employee"}`}
-                </DialogTitle>
-                <DialogDescription>
-                  {employeeDetails && (
-                    <div className="mt-2 p-3 bg-muted/50 rounded-lg">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="font-medium">Name:</span> {employeeDetails.name}
-                        </div>
-                        <div>
-                          <span className="font-medium">Email:</span> {employeeDetails.email}
-                        </div>
-                        <div>
-                          <span className="font-medium">Role:</span> {employeeDetails.role}
-                        </div>
-                        <div>
-                          <span className="font-medium">Cycle:</span> {selectedReview.cycle?.name || "N/A"}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-              <ReviewFormComponent
-                cycleId={selectedReview.cycleId}
-                employeeId={selectedReview.employeeId}
-                employeeName={selectedReview.employee?.name || "Employee"}
-                reviewerId={selectedReview.reviewerId}
-                reviewerType={selectedReview.reviewerType as any}
-                existingFormId={selectedReview.id}
-                existingData={{
-                  overallRating: selectedReview.overallRating || undefined,
-                  goalsAchievement: selectedReview.goalsAchievement || undefined,
-                  strengths: selectedReview.strengths || undefined,
-                  improvements: selectedReview.improvements || undefined,
-                  kpiScores: selectedReview.kpiScores ? JSON.parse(selectedReview.kpiScores) : undefined,
-                  additionalComments: selectedReview.additionalComments || undefined,
-                }}
-                onSuccess={() => {
-                  setIsReviewDialogOpen(false)
-                  setEmployeeDetails(null)
-                  fetchData()
-                }}
-                onCancel={() => {
-                  setIsReviewDialogOpen(false)
-                  setEmployeeDetails(null)
-                }}
-              />
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* View Review Dialog */}
-      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-[#00C2FF]/20">
-          {selectedReview && (
-            <ReviewFormComponent
-              cycleId={selectedReview.cycleId}
-              employeeId={selectedReview.employeeId}
-              employeeName={selectedReview.employee?.name || "Employee"}
-              reviewerId={selectedReview.reviewerId}
-              reviewerType={selectedReview.reviewerType as any}
-              existingFormId={selectedReview.id}
-              existingData={{
-                overallRating: selectedReview.overallRating || undefined,
-                goalsAchievement: selectedReview.goalsAchievement || undefined,
-                strengths: selectedReview.strengths || undefined,
-                improvements: selectedReview.improvements || undefined,
-                kpiScores: selectedReview.kpiScores ? JSON.parse(selectedReview.kpiScores) : undefined,
-                additionalComments: selectedReview.additionalComments || undefined,
-              }}
-              onCancel={() => setIsViewDialogOpen(false)}
-              readOnly={true}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
