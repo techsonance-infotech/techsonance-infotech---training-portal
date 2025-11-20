@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewForms, reviewCycles, user, reviewerAssignments, reviewNotifications } from '@/db/schema';
-import { eq, and, or, desc } from 'drizzle-orm';
+import { eq, and, or, desc, sql } from 'drizzle-orm';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -20,19 +20,11 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '20'), 100);
     const offset = parseInt(searchParams.get('offset') ?? '0');
 
-    let query = db
-      .select({
-        form: reviewForms,
-        employee: user,
-        reviewer: user,
-        cycle: reviewCycles,
-      })
-      .from(reviewForms)
-      .leftJoin(user, eq(reviewForms.employeeId, user.id))
-      .leftJoin(user, eq(reviewForms.reviewerId, user.id))
-      .leftJoin(reviewCycles, eq(reviewForms.cycleId, reviewCycles.id))
-      .$dynamic();
+    // Create aliases for employee and reviewer joins
+    const employeeAlias = sql`employee`;
+    const reviewerAlias = sql`reviewer`;
 
+    // Build query with proper table aliases
     const conditions = [];
 
     // Role-based filtering
@@ -73,24 +65,108 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Fetch forms with cycle information
+    const formsQuery = db
+      .select({
+        id: reviewForms.id,
+        cycleId: reviewForms.cycleId,
+        employeeId: reviewForms.employeeId,
+        reviewerId: reviewForms.reviewerId,
+        reviewerType: reviewForms.reviewerType,
+        status: reviewForms.status,
+        overallRating: reviewForms.overallRating,
+        goalsAchievement: reviewForms.goalsAchievement,
+        strengths: reviewForms.strengths,
+        improvements: reviewForms.improvements,
+        kpiScores: reviewForms.kpiScores,
+        additionalComments: reviewForms.additionalComments,
+        submittedAt: reviewForms.submittedAt,
+        createdAt: reviewForms.createdAt,
+        updatedAt: reviewForms.updatedAt,
+        cycleName: reviewCycles.name,
+        cycleStatus: reviewCycles.status,
+        cycleStartDate: reviewCycles.startDate,
+        cycleEndDate: reviewCycles.endDate,
+      })
+      .from(reviewForms)
+      .leftJoin(reviewCycles, eq(reviewForms.cycleId, reviewCycles.id));
+
     if (conditions.length > 0) {
-      query = query.where(and(...conditions));
+      const results = await formsQuery
+        .where(and(...conditions))
+        .orderBy(desc(reviewForms.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Fetch employee and reviewer details separately
+      const formsWithDetails = await Promise.all(
+        results.map(async (form) => {
+          const employeeData = await db
+            .select()
+            .from(user)
+            .where(eq(user.id, form.employeeId))
+            .limit(1);
+
+          const reviewerData = await db
+            .select()
+            .from(user)
+            .where(eq(user.id, form.reviewerId))
+            .limit(1);
+
+          return {
+            ...form,
+            cycle: form.cycleName ? {
+              id: form.cycleId,
+              name: form.cycleName,
+              status: form.cycleStatus,
+              startDate: form.cycleStartDate,
+              endDate: form.cycleEndDate,
+            } : null,
+            employee: employeeData[0] || null,
+            reviewer: reviewerData[0] || null,
+          };
+        })
+      );
+
+      return NextResponse.json(formsWithDetails, { status: 200 });
+    } else {
+      const results = await formsQuery
+        .orderBy(desc(reviewForms.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      // Fetch employee and reviewer details separately
+      const formsWithDetails = await Promise.all(
+        results.map(async (form) => {
+          const employeeData = await db
+            .select()
+            .from(user)
+            .where(eq(user.id, form.employeeId))
+            .limit(1);
+
+          const reviewerData = await db
+            .select()
+            .from(user)
+            .where(eq(user.id, form.reviewerId))
+            .limit(1);
+
+          return {
+            ...form,
+            cycle: form.cycleName ? {
+              id: form.cycleId,
+              name: form.cycleName,
+              status: form.cycleStatus,
+              startDate: form.cycleStartDate,
+              endDate: form.cycleEndDate,
+            } : null,
+            employee: employeeData[0] || null,
+            reviewer: reviewerData[0] || null,
+          };
+        })
+      );
+
+      return NextResponse.json(formsWithDetails, { status: 200 });
     }
-
-    const results = await query
-      .orderBy(desc(reviewForms.createdAt))
-      .limit(limit)
-      .offset(offset);
-
-    // Transform results to include joined data
-    const forms = results.map(result => ({
-      ...result.form,
-      employee: result.employee,
-      reviewer: result.reviewer,
-      cycle: result.cycle,
-    }));
-
-    return NextResponse.json(forms, { status: 200 });
   } catch (error) {
     console.error('GET error:', error);
     return NextResponse.json(
