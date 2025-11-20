@@ -8,11 +8,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Skeleton } from "@/components/ui/skeleton"
 import { PageLoader } from "@/components/ui/loading-spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import {
   Dialog,
   DialogContent,
@@ -20,7 +18,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -29,9 +26,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Save, Plus, Trash2, Calendar, BookOpen, Clock } from "lucide-react"
+import { ArrowLeft, Save, Plus, Trash2, Calendar, BookOpen, Clock, Edit, ChevronRight, ListTree } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import { RichTextEditor } from "@/components/ui/rich-text-editor"
 
 interface Course {
   id: number
@@ -49,6 +47,9 @@ interface Topic {
   videoUrl: string | null
   attachmentUrl: string | null
   orderIndex: number
+  parentTopicId: number | null
+  orderNumber: number
+  subtopics: Topic[]
 }
 
 interface Activity {
@@ -79,6 +80,8 @@ export default function EditCoursePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isTopicDialogOpen, setIsTopicDialogOpen] = useState(false)
   const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false)
+  const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
+  const [parentTopicForSubtopic, setParentTopicForSubtopic] = useState<number | null>(null)
 
   const [newTopic, setNewTopic] = useState({
     title: "",
@@ -86,6 +89,8 @@ export default function EditCoursePage() {
     videoUrl: "",
     attachmentUrl: "",
     orderIndex: 0,
+    orderNumber: 0,
+    parentTopicId: null as number | null,
   })
 
   const [newActivity, setNewActivity] = useState({
@@ -102,6 +107,24 @@ export default function EditCoursePage() {
       fetchActivities()
     }
   }, [courseId, isNew])
+
+  // Scroll to tabs section when hash changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.replace('#', '')
+      if (hash === 'topics' || hash === 'activities') {
+        setTimeout(() => {
+          const element = document.querySelector(`[value="${hash}"]`)
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            // Trigger the tab
+            const tabsTrigger = element as HTMLButtonElement
+            tabsTrigger.click()
+          }
+        }, 100)
+      }
+    }
+  }, [])
 
   const fetchCourse = async () => {
     try {
@@ -156,7 +179,7 @@ export default function EditCoursePage() {
           description: course.description,
           startDate: course.startDate,
           endDate: course.endDate,
-          createdBy: 1, // Admin user ID
+          createdBy: 1,
         }),
       })
 
@@ -175,33 +198,131 @@ export default function EditCoursePage() {
     }
   }
 
-  const handleAddTopic = async () => {
+  const openTopicDialog = (parentTopic?: Topic) => {
+    if (parentTopic) {
+      setParentTopicForSubtopic(parentTopic.id)
+      setNewTopic({
+        title: "",
+        content: "",
+        videoUrl: "",
+        attachmentUrl: "",
+        orderIndex: 0,
+        orderNumber: countAllTopics(topics) + 1,
+        parentTopicId: parentTopic.id,
+      })
+    } else {
+      setParentTopicForSubtopic(null)
+      setNewTopic({
+        title: "",
+        content: "",
+        videoUrl: "",
+        attachmentUrl: "",
+        orderIndex: topics.length,
+        orderNumber: countAllTopics(topics) + 1,
+        parentTopicId: null,
+      })
+    }
+    setEditingTopic(null)
+    setIsTopicDialogOpen(true)
+  }
+
+  const openEditTopicDialog = (topic: Topic) => {
+    setEditingTopic(topic)
+    setNewTopic({
+      title: topic.title,
+      content: topic.content,
+      videoUrl: topic.videoUrl || "",
+      attachmentUrl: topic.attachmentUrl || "",
+      orderIndex: topic.orderIndex,
+      orderNumber: topic.orderNumber,
+      parentTopicId: topic.parentTopicId,
+    })
+    setParentTopicForSubtopic(topic.parentTopicId)
+    setIsTopicDialogOpen(true)
+  }
+
+  const countAllTopics = (topicList: Topic[]): number => {
+    let count = topicList.length
+    topicList.forEach(topic => {
+      count += countAllTopics(topic.subtopics)
+    })
+    return count
+  }
+
+  const handleSaveTopic = async () => {
     if (!newTopic.title.trim() || !newTopic.content.trim()) {
-      toast.error("Please fill in required fields")
+      toast.error("Please fill in title and content")
       return
     }
 
     try {
-      const response = await fetch(`/api/courses/${courseId}/topics`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...newTopic,
-          orderIndex: topics.length,
-        }),
+      if (editingTopic) {
+        // Update existing topic
+        const response = await fetch(`/api/topics/${editingTopic.id}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: newTopic.title,
+            content: newTopic.content,
+            videoUrl: newTopic.videoUrl || null,
+            attachmentUrl: newTopic.attachmentUrl || null,
+            orderIndex: newTopic.orderIndex,
+            orderNumber: newTopic.orderNumber,
+            parentTopicId: newTopic.parentTopicId,
+          }),
+        })
+
+        if (!response.ok) throw new Error("Failed to update topic")
+        toast.success("Topic updated successfully")
+      } else {
+        // Create new topic
+        const response = await fetch(`/api/courses/${courseId}/topics`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(newTopic),
+        })
+
+        if (!response.ok) throw new Error("Failed to add topic")
+        toast.success(parentTopicForSubtopic ? "Subtopic added successfully" : "Topic added successfully")
+      }
+
+      fetchTopics()
+      setIsTopicDialogOpen(false)
+      setEditingTopic(null)
+      setParentTopicForSubtopic(null)
+      setNewTopic({ 
+        title: "", 
+        content: "", 
+        videoUrl: "", 
+        attachmentUrl: "", 
+        orderIndex: 0, 
+        orderNumber: 0,
+        parentTopicId: null,
+      })
+    } catch (error) {
+      toast.error(editingTopic ? "Failed to update topic" : "Failed to add topic")
+    }
+  }
+
+  const handleDeleteTopic = async (topicId: number) => {
+    if (!confirm("Delete this topic and all its subtopics?")) return
+
+    try {
+      const response = await fetch(`/api/topics/${topicId}`, {
+        method: "DELETE",
       })
 
-      if (!response.ok) throw new Error("Failed to add topic")
+      if (!response.ok) throw new Error("Failed to delete topic")
 
       const data = await response.json()
-      setTopics([...topics, data])
-      setNewTopic({ title: "", content: "", videoUrl: "", attachmentUrl: "", orderIndex: 0 })
-      setIsTopicDialogOpen(false)
-      toast.success("Topic added successfully")
+      toast.success(`Deleted ${data.deletedCount} topic(s) successfully`)
+      fetchTopics()
     } catch (error) {
-      toast.error("Failed to add topic")
+      toast.error("Failed to delete topic")
     }
   }
 
@@ -239,6 +360,88 @@ export default function EditCoursePage() {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+    })
+  }
+
+  const renderTopicNumber = (topic: Topic, parentNumber: string = ""): string => {
+    const currentNumber = parentNumber ? `${parentNumber}.${topic.orderNumber}` : `${topic.orderNumber}`
+    return currentNumber
+  }
+
+  const renderTopicsHierarchy = (topicList: Topic[], level: number = 0, parentNumber: string = "") => {
+    return topicList.map((topic, index) => {
+      const topicNumber = parentNumber ? `${parentNumber}.${index + 1}` : `${index + 1}`
+      
+      return (
+        <div key={topic.id} className={`${level > 0 ? 'ml-8' : ''}`}>
+          <div className="flex items-start justify-between p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="bg-primary/10 text-primary px-2.5 py-1 rounded-lg font-semibold text-sm min-w-[3rem] text-center">
+                {topicNumber}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-semibold flex items-center gap-2">
+                  {topic.title}
+                  {level > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      Subtopic
+                    </Badge>
+                  )}
+                </h4>
+                <div 
+                  className="text-sm text-muted-foreground mt-1 line-clamp-2 prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: topic.content }}
+                />
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {topic.videoUrl && (
+                    <Badge variant="outline" className="text-xs">Video</Badge>
+                  )}
+                  {topic.attachmentUrl && (
+                    <Badge variant="outline" className="text-xs">Attachment</Badge>
+                  )}
+                  {topic.subtopics && topic.subtopics.length > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {topic.subtopics.length} subtopic{topic.subtopics.length > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-1 ml-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openTopicDialog(topic)}
+                title="Add subtopic"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Sub
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openEditTopicDialog(topic)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => handleDeleteTopic(topic.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          
+          {topic.subtopics && topic.subtopics.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {renderTopicsHierarchy(topic.subtopics, level + 1, topicNumber)}
+            </div>
+          )}
+        </div>
+      )
     })
   }
 
@@ -325,7 +528,7 @@ export default function EditCoursePage() {
           </CardContent>
         </Card>
 
-        {/* Topics and Activities - Only show for existing courses */}
+        {/* Topics and Activities */}
         {!isNew && (
           <Tabs defaultValue="topics" className="space-y-4">
             <TabsList>
@@ -339,72 +542,16 @@ export default function EditCoursePage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>Course Topics</CardTitle>
-                      <CardDescription>Learning materials and content</CardDescription>
+                      <CardTitle className="flex items-center gap-2">
+                        <ListTree className="h-5 w-5" />
+                        Course Topics
+                      </CardTitle>
+                      <CardDescription>Learning materials with hierarchical structure (topics and subtopics)</CardDescription>
                     </div>
-                    <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Topic
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add New Topic</DialogTitle>
-                          <DialogDescription>
-                            Create a new learning topic for this course
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="topicTitle">Title *</Label>
-                            <Input
-                              id="topicTitle"
-                              placeholder="e.g., Introduction to Hooks"
-                              value={newTopic.title}
-                              onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="topicContent">Content *</Label>
-                            <Textarea
-                              id="topicContent"
-                              placeholder="Topic content and learning materials..."
-                              value={newTopic.content}
-                              onChange={(e) => setNewTopic({ ...newTopic, content: e.target.value })}
-                              rows={4}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="videoUrl">Video URL (Optional)</Label>
-                            <Input
-                              id="videoUrl"
-                              placeholder="https://..."
-                              value={newTopic.videoUrl}
-                              onChange={(e) => setNewTopic({ ...newTopic, videoUrl: e.target.value })}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="attachmentUrl">Attachment URL (Optional)</Label>
-                            <Input
-                              id="attachmentUrl"
-                              placeholder="https://..."
-                              value={newTopic.attachmentUrl}
-                              onChange={(e) =>
-                                setNewTopic({ ...newTopic, attachmentUrl: e.target.value })
-                              }
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsTopicDialogOpen(false)}>
-                            Cancel
-                          </Button>
-                          <Button onClick={handleAddTopic}>Add Topic</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                    <Button onClick={() => openTopicDialog()}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Topic
+                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -413,42 +560,14 @@ export default function EditCoursePage() {
                       <BookOpen className="h-16 w-16 mx-auto mb-4 opacity-50" />
                       <h3 className="text-lg font-semibold mb-2">No topics yet</h3>
                       <p className="mb-4">Add topics to structure your course content</p>
-                      <Button onClick={() => setIsTopicDialogOpen(true)}>
+                      <Button onClick={() => openTopicDialog()}>
                         <Plus className="h-4 w-4 mr-2" />
                         Add First Topic
                       </Button>
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      {topics.map((topic, index) => (
-                        <div
-                          key={topic.id}
-                          className="flex items-start justify-between p-4 rounded-lg border bg-card"
-                        >
-                          <div className="flex items-start gap-3 flex-1">
-                            <div className="bg-primary/10 text-primary p-2 rounded-lg font-semibold text-sm">
-                              {index + 1}
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold">{topic.title}</h4>
-                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                                {topic.content}
-                              </p>
-                              <div className="flex items-center gap-2 mt-2">
-                                {topic.videoUrl && (
-                                  <Badge variant="outline">Video</Badge>
-                                )}
-                                {topic.attachmentUrl && (
-                                  <Badge variant="outline">Attachment</Badge>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="icon" className="text-muted-foreground">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
+                      {renderTopicsHierarchy(topics)}
                     </div>
                   )}
                 </CardContent>
@@ -465,84 +584,10 @@ export default function EditCoursePage() {
                       <CardDescription>Scheduled sessions and events</CardDescription>
                     </div>
                     <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Activity
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Add New Activity</DialogTitle>
-                          <DialogDescription>
-                            Schedule a new activity for this course
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="activityTitle">Title *</Label>
-                            <Input
-                              id="activityTitle"
-                              placeholder="e.g., Overview Session"
-                              value={newActivity.title}
-                              onChange={(e) =>
-                                setNewActivity({ ...newActivity, title: e.target.value })
-                              }
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="activityType">Type *</Label>
-                            <Select
-                              value={newActivity.type}
-                              onValueChange={(value) =>
-                                setNewActivity({ ...newActivity, type: value })
-                              }
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="overview">Overview</SelectItem>
-                                <SelectItem value="discussion">Discussion</SelectItem>
-                                <SelectItem value="practical">Practical</SelectItem>
-                                <SelectItem value="review">Review</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="activityDescription">Description *</Label>
-                            <Textarea
-                              id="activityDescription"
-                              placeholder="Activity details..."
-                              value={newActivity.description}
-                              onChange={(e) =>
-                                setNewActivity({ ...newActivity, description: e.target.value })
-                              }
-                              rows={3}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="scheduledDate">Scheduled Date & Time *</Label>
-                            <Input
-                              id="scheduledDate"
-                              type="datetime-local"
-                              value={newActivity.scheduledDate}
-                              onChange={(e) =>
-                                setNewActivity({ ...newActivity, scheduledDate: e.target.value })
-                              }
-                            />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsActivityDialogOpen(false)}
-                          >
-                            Cancel
-                          </Button>
-                          <Button onClick={handleAddActivity}>Add Activity</Button>
-                        </DialogFooter>
-                      </DialogContent>
+                      <Button onClick={() => setIsActivityDialogOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Activity
+                      </Button>
                     </Dialog>
                   </div>
                 </CardHeader>
@@ -592,6 +637,144 @@ export default function EditCoursePage() {
             </TabsContent>
           </Tabs>
         )}
+
+        {/* Topic Dialog - Full Screen */}
+        <Dialog open={isTopicDialogOpen} onOpenChange={setIsTopicDialogOpen}>
+          <DialogContent className="max-w-[95vw] w-full h-[95vh] max-h-[95vh] p-0 gap-0">
+            <DialogHeader className="px-6 py-4 border-b">
+              <DialogTitle>
+                {editingTopic 
+                  ? "Edit Topic" 
+                  : parentTopicForSubtopic 
+                    ? "Add Subtopic" 
+                    : "Add New Topic"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingTopic
+                  ? "Update the topic content using the rich text editor below"
+                  : parentTopicForSubtopic
+                    ? "Create a new subtopic with detailed content"
+                    : "Create a new learning topic for this course"}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="topicTitle">Title *</Label>
+                <Input
+                  id="topicTitle"
+                  placeholder="e.g., Introduction to React Hooks"
+                  value={newTopic.title}
+                  onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="topicContent">Content *</Label>
+                <RichTextEditor
+                  content={newTopic.content}
+                  onChange={(content) => setNewTopic({ ...newTopic, content })}
+                  placeholder="Enter detailed topic content with rich formatting..."
+                />
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="videoUrl">Video URL (Optional)</Label>
+                  <Input
+                    id="videoUrl"
+                    placeholder="https://youtube.com/..."
+                    value={newTopic.videoUrl}
+                    onChange={(e) => setNewTopic({ ...newTopic, videoUrl: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="attachmentUrl">Attachment URL (Optional)</Label>
+                  <Input
+                    id="attachmentUrl"
+                    placeholder="https://..."
+                    value={newTopic.attachmentUrl}
+                    onChange={(e) => setNewTopic({ ...newTopic, attachmentUrl: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <DialogFooter className="px-6 py-4 border-t">
+              <Button variant="outline" onClick={() => setIsTopicDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveTopic}>
+                {editingTopic ? "Update Topic" : "Add Topic"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Activity Dialog */}
+        <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Activity</DialogTitle>
+              <DialogDescription>
+                Schedule a new activity for this course
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="activityTitle">Title *</Label>
+                <Input
+                  id="activityTitle"
+                  placeholder="e.g., Overview Session"
+                  value={newActivity.title}
+                  onChange={(e) => setNewActivity({ ...newActivity, title: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="activityType">Type *</Label>
+                <Select
+                  value={newActivity.type}
+                  onValueChange={(value) => setNewActivity({ ...newActivity, type: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="overview">Overview</SelectItem>
+                    <SelectItem value="discussion">Discussion</SelectItem>
+                    <SelectItem value="practical">Practical</SelectItem>
+                    <SelectItem value="review">Review</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="activityDescription">Description *</Label>
+                <Textarea
+                  id="activityDescription"
+                  placeholder="Activity details..."
+                  value={newActivity.description}
+                  onChange={(e) => setNewActivity({ ...newActivity, description: e.target.value })}
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="scheduledDate">Scheduled Date & Time *</Label>
+                <Input
+                  id="scheduledDate"
+                  type="datetime-local"
+                  value={newActivity.scheduledDate}
+                  onChange={(e) => setNewActivity({ ...newActivity, scheduledDate: e.target.value })}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsActivityDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddActivity}>Add Activity</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   )
