@@ -7,7 +7,14 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { LoadingSpinner, PageLoader } from "@/components/ui/loading-spinner"
-import { BookOpen, Calendar, CheckCircle2, Clock, FileText, TrendingUp } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { BookOpen, Calendar, CheckCircle2, Clock, FileText, TrendingUp, ExternalLink } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 
@@ -43,6 +50,7 @@ interface Policy {
   title: string
   description: string
   required: boolean
+  content?: string
 }
 
 export default function EmployeeDashboard() {
@@ -50,6 +58,9 @@ export default function EmployeeDashboard() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hoveredPolicy, setHoveredPolicy] = useState<Policy | null>(null)
+  const [isPolicyDialogOpen, setIsPolicyDialogOpen] = useState(false)
+  const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     fetchDashboardData()
@@ -96,6 +107,34 @@ export default function EmployeeDashboard() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handlePolicyHover = (policy: Policy) => {
+    // Clear any existing timeout
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout)
+    }
+    
+    // Set a small delay before showing the dialog
+    const timeout = setTimeout(() => {
+      setHoveredPolicy(policy)
+      setIsPolicyDialogOpen(true)
+    }, 300)
+    
+    setHoverTimeout(timeout)
+  }
+
+  const handlePolicyLeave = () => {
+    // Clear the timeout if mouse leaves before dialog opens
+    if (hoverTimeout) {
+      clearTimeout(hoverTimeout)
+      setHoverTimeout(null)
+    }
+  }
+
+  const handleDialogClose = () => {
+    setIsPolicyDialogOpen(false)
+    setHoveredPolicy(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -328,7 +367,7 @@ export default function EmployeeDashboard() {
                 <CardDescription>Required training and compliance materials</CardDescription>
               </div>
               <Button variant="outline" size="sm" asChild className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10 transition-all duration-300">
-                <Link href="/dashboard/policies">View All</Link>
+                <Link href="/policies">View All</Link>
               </Button>
             </div>
           </CardHeader>
@@ -345,7 +384,12 @@ export default function EmployeeDashboard() {
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {policies.map((policy) => (
-                  <Card key={policy.id} className="border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-lg hover:shadow-[#00C2FF]/20 hover:-translate-y-1 cursor-pointer">
+                  <Card 
+                    key={policy.id} 
+                    className="border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-lg hover:shadow-[#00C2FF]/20 hover:-translate-y-1 cursor-pointer"
+                    onMouseEnter={() => handlePolicyHover(policy)}
+                    onMouseLeave={handlePolicyLeave}
+                  >
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <FileText className="h-5 w-5 text-[#00C2FF]" />
@@ -403,6 +447,49 @@ export default function EmployeeDashboard() {
             </Link>
           </Card>
         </div>
+
+        {/* Policy Detail Dialog */}
+        <Dialog open={isPolicyDialogOpen} onOpenChange={handleDialogClose}>
+          <DialogContent 
+            className="max-w-3xl max-h-[90vh] overflow-y-auto"
+            onPointerDownOutside={(e) => e.preventDefault()}
+          >
+            <DialogHeader>
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <DialogTitle className="text-2xl">{hoveredPolicy?.title}</DialogTitle>
+                  <DialogDescription className="mt-2">
+                    {hoveredPolicy?.description}
+                  </DialogDescription>
+                </div>
+                {hoveredPolicy?.required && (
+                  <Badge variant="destructive" className="ml-2">
+                    Required
+                  </Badge>
+                )}
+              </div>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {hoveredPolicy?.content || "No content available"}
+                </div>
+              </div>
+              <div className="pt-4 border-t">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  asChild
+                >
+                  <Link href="/policies">
+                    <FileText className="h-4 w-4 mr-2" />
+                    View All Policies
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   )
