@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewerAssignments, reviewCycles, user, reviewNotifications } from '@/db/schema';
+import { reviewerAssignments, reviewCycles, user, reviewNotifications, reviewForms } from '@/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
 import { getCurrentUser } from '@/lib/auth';
 
@@ -241,16 +241,50 @@ export async function POST(
       .values(assignmentsToCreate)
       .returning();
 
-    // Create notifications for each reviewer
-    const notificationsToCreate = createdAssignments.map(assignment => ({
-      userId: assignment.reviewerId,
-      notificationType: 'review_requested',
-      title: 'New Review Requested',
-      message: `You have been assigned to review ${userMap.get(assignment.employeeId) || 'an employee'} for ${cycle[0].name}`,
-      relatedId: cycleId,
-      isRead: false,
+    // Create review forms for each assignment
+    const formsToCreate = createdAssignments.map(assignment => ({
+      cycleId,
+      employeeId: assignment.employeeId,
+      reviewerId: assignment.reviewerId,
+      reviewerType: assignment.reviewerType,
+      status: 'pending',
+      overallRating: null,
+      goalsAchievement: null,
+      strengths: null,
+      improvements: null,
+      kpiScores: null,
+      additionalComments: null,
+      submittedAt: null,
       createdAt: now,
+      updatedAt: now,
     }));
+
+    const createdForms = await db.insert(reviewForms)
+      .values(formsToCreate)
+      .returning();
+
+    // Create a map of assignment to form ID
+    const formMap = new Map();
+    createdAssignments.forEach((assignment, index) => {
+      const key = `${assignment.employeeId}-${assignment.reviewerId}-${assignment.reviewerType}`;
+      formMap.set(key, createdForms[index].id);
+    });
+
+    // Create notifications for each reviewer with form ID
+    const notificationsToCreate = createdAssignments.map(assignment => {
+      const key = `${assignment.employeeId}-${assignment.reviewerId}-${assignment.reviewerType}`;
+      const formId = formMap.get(key);
+      
+      return {
+        userId: assignment.reviewerId,
+        notificationType: 'review_requested',
+        title: 'New Review Requested',
+        message: `You have been assigned to review ${userMap.get(assignment.employeeId) || 'an employee'} for ${cycle[0].name}`,
+        relatedId: formId,
+        isRead: false,
+        createdAt: now,
+      };
+    });
 
     await db.insert(reviewNotifications)
       .values(notificationsToCreate);
@@ -268,7 +302,11 @@ export async function POST(
       .from(reviewerAssignments)
       .where(inArray(reviewerAssignments.id, createdAssignments.map(a => a.id)));
 
-    return NextResponse.json(finalAssignments, { status: 201 });
+    return NextResponse.json({
+      assignments: finalAssignments,
+      formsCreated: createdForms.length,
+      message: `Successfully created ${finalAssignments.length} assignments and ${createdForms.length} review forms`
+    }, { status: 201 });
 
   } catch (error: any) {
     console.error('POST assignments error:', error);
