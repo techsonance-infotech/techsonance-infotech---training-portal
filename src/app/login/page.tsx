@@ -158,21 +158,6 @@ export default function LoginPage() {
             </div>
           </CardFooter>
         </form>
-        <div className="px-6 pb-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-[#00C2FF]/20" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Demo Credentials</span>
-            </div>
-          </div>
-          <div className="mt-4 space-y-2 text-xs text-muted-foreground">
-            <p><strong className="text-[#00C2FF]">Admin:</strong> admin@company.com / Admin123!</p>
-            <p><strong className="text-[#00C2FF]">Employee:</strong> john.doe@company.com / Employee123!</p>
-            <p><strong className="text-[#00C2FF]">Intern:</strong> intern@company.com / Intern123!</p>
-          </div>
-        </div>
       </Card>
     </div>
   )
