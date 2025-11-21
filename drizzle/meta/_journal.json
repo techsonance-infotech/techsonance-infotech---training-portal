@@ -22,6 +22,20 @@
       "when": 1763534204943,
       "tag": "0002_sparkling_mandroid",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1763619022536,
+      "tag": "0003_sloppy_wiccan",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1763708058934,
+      "tag": "0004_robust_polaris",
+      "breakpoints": true
     }
   ]
 }

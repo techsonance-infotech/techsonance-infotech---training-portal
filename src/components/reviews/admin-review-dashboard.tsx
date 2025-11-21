@@ -47,8 +47,11 @@ import {
   FileText,
   Calendar,
   Star,
+  DollarSign,
+  Edit,
 } from "lucide-react"
 import { toast } from "sonner"
+import { Textarea } from "@/components/ui/textarea"
 
 interface ReviewCycle {
   id: number
@@ -112,20 +115,40 @@ interface ReviewForm {
   cycle: ReviewCycle | null
 }
 
+interface Appraisal {
+  id: number
+  employeeId: string
+  cycleId: number
+  reviewYear: number
+  pastCtc: number
+  currentCtc: number
+  hikePercentage: number
+  notes: string | null
+  updatedBy: string
+  createdAt: string
+  updatedAt: string
+  employee: User | null
+  cycle: ReviewCycle | null
+  updatedByUser: User | null
+}
+
 export function AdminReviewDashboard() {
   const [cycles, setCycles] = useState<ReviewCycle[]>([])
   const [stats, setStats] = useState<ReviewStats | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [reviewForms, setReviewForms] = useState<ReviewForm[]>([])
+  const [appraisals, setAppraisals] = useState<Appraisal[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("overview")
   const [selectedForm, setSelectedForm] = useState<ReviewForm | null>(null)
+  const [selectedAppraisal, setSelectedAppraisal] = useState<Appraisal | null>(null)
   
   // Dialog states
   const [isCreateCycleOpen, setIsCreateCycleOpen] = useState(false)
   const [isAssignReviewersOpen, setIsAssignReviewersOpen] = useState(false)
   const [isViewFormOpen, setIsViewFormOpen] = useState(false)
+  const [isAppraisalDialogOpen, setIsAppraisalDialogOpen] = useState(false)
   
   // Form states
   const [newCycle, setNewCycle] = useState({
@@ -143,6 +166,16 @@ export function AdminReviewDashboard() {
     reviewerTypes: {} as Record<string, string>,
   })
 
+  const [appraisalForm, setAppraisalForm] = useState({
+    employeeId: "",
+    cycleId: "",
+    reviewYear: new Date().getFullYear(),
+    pastCtc: "",
+    currentCtc: "",
+    hikePercentage: "",
+    notes: "",
+  })
+
   useEffect(() => {
     fetchData()
   }, [])
@@ -156,6 +189,7 @@ export function AdminReviewDashboard() {
         fetchUsers(),
         fetchAssignments(),
         fetchReviewForms(),
+        fetchAppraisals(),
       ])
     } catch (error) {
       toast.error("Failed to load dashboard data")
@@ -249,6 +283,20 @@ export function AdminReviewDashboard() {
       if (!response.ok) throw new Error("Failed to fetch review forms")
       const data = await response.json()
       setReviewForms(data)
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  const fetchAppraisals = async () => {
+    try {
+      const token = localStorage.getItem("bearer_token")
+      const response = await fetch("/api/appraisals?limit=100", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error("Failed to fetch appraisals")
+      const data = await response.json()
+      setAppraisals(data)
     } catch (error) {
       console.error(error)
     }
@@ -426,6 +474,116 @@ export function AdminReviewDashboard() {
     }
   }
 
+  const handleCreateOrUpdateAppraisal = async () => {
+    if (!appraisalForm.employeeId || !appraisalForm.cycleId || !appraisalForm.pastCtc || !appraisalForm.currentCtc) {
+      toast.error("Please fill in all required fields")
+      return
+    }
+
+    const pastCtc = parseInt(appraisalForm.pastCtc)
+    const currentCtc = parseInt(appraisalForm.currentCtc)
+    
+    if (isNaN(pastCtc) || isNaN(currentCtc) || pastCtc <= 0 || currentCtc <= 0) {
+      toast.error("Please enter valid CTC amounts")
+      return
+    }
+
+    const payload = {
+      employeeId: appraisalForm.employeeId,
+      cycleId: parseInt(appraisalForm.cycleId),
+      reviewYear: appraisalForm.reviewYear,
+      pastCtc,
+      currentCtc,
+      hikePercentage: appraisalForm.hikePercentage ? parseFloat(appraisalForm.hikePercentage) : undefined,
+      notes: appraisalForm.notes || undefined,
+    }
+
+    try {
+      const token = localStorage.getItem("bearer_token")
+      const isUpdate = selectedAppraisal !== null
+      const url = isUpdate ? `/api/appraisals/${selectedAppraisal.id}` : "/api/appraisals"
+      const method = isUpdate ? "PUT" : "POST"
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || `Failed to ${isUpdate ? "update" : "create"} appraisal`)
+      }
+
+      toast.success(`Appraisal ${isUpdate ? "updated" : "created"} successfully`)
+      setIsAppraisalDialogOpen(false)
+      setSelectedAppraisal(null)
+      setAppraisalForm({
+        employeeId: "",
+        cycleId: "",
+        reviewYear: new Date().getFullYear(),
+        pastCtc: "",
+        currentCtc: "",
+        hikePercentage: "",
+        notes: "",
+      })
+      fetchAppraisals()
+    } catch (error: any) {
+      toast.error(error.message || `Failed to ${selectedAppraisal ? "update" : "create"} appraisal`)
+    }
+  }
+
+  const handleEditAppraisal = (appraisal: Appraisal) => {
+    setSelectedAppraisal(appraisal)
+    setAppraisalForm({
+      employeeId: appraisal.employeeId,
+      cycleId: appraisal.cycleId.toString(),
+      reviewYear: appraisal.reviewYear,
+      pastCtc: appraisal.pastCtc.toString(),
+      currentCtc: appraisal.currentCtc.toString(),
+      hikePercentage: appraisal.hikePercentage.toString(),
+      notes: appraisal.notes || "",
+    })
+    setIsAppraisalDialogOpen(true)
+  }
+
+  const handleDeleteAppraisal = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this appraisal record?")) {
+      return
+    }
+
+    try {
+      const token = localStorage.getItem("bearer_token")
+      const response = await fetch(`/api/appraisals/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to delete appraisal")
+      }
+
+      toast.success("Appraisal deleted successfully")
+      fetchAppraisals()
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete appraisal")
+    }
+  }
+
+  const calculateAutoHike = () => {
+    const pastCtc = parseFloat(appraisalForm.pastCtc)
+    const currentCtc = parseFloat(appraisalForm.currentCtc)
+    
+    if (!isNaN(pastCtc) && !isNaN(currentCtc) && pastCtc > 0) {
+      const hike = ((currentCtc - pastCtc) / pastCtc) * 100
+      setAppraisalForm({ ...appraisalForm, hikePercentage: hike.toFixed(2) })
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "active": return "bg-green-500"
@@ -555,11 +713,12 @@ export function AdminReviewDashboard() {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="submitted">Submitted</TabsTrigger>
           <TabsTrigger value="pending">Pending</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsTrigger value="appraisals">Appraisals</TabsTrigger>
           <TabsTrigger value="cycles">Cycles</TabsTrigger>
         </TabsList>
 
@@ -861,6 +1020,120 @@ export function AdminReviewDashboard() {
                   ))
                 )}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Appraisals Tab */}
+        <TabsContent value="appraisals" className="space-y-4">
+          <Card className="border-[#00C2FF]/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+                    Employee Appraisals
+                  </CardTitle>
+                  <CardDescription>Manage salary appraisals after reviews are completed</CardDescription>
+                </div>
+                <Button
+                  onClick={() => {
+                    setSelectedAppraisal(null)
+                    setAppraisalForm({
+                      employeeId: "",
+                      cycleId: "",
+                      reviewYear: new Date().getFullYear(),
+                      pastCtc: "",
+                      currentCtc: "",
+                      hikePercentage: "",
+                      notes: "",
+                    })
+                    setIsAppraisalDialogOpen(true)
+                  }}
+                  className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Appraisal
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {appraisals.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  No appraisals recorded yet. Start by adding appraisal details for employees.
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Employee</TableHead>
+                      <TableHead>Cycle</TableHead>
+                      <TableHead>Year</TableHead>
+                      <TableHead className="text-right">Past CTC</TableHead>
+                      <TableHead className="text-right">Current CTC</TableHead>
+                      <TableHead className="text-right">Hike %</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {appraisals.map((appraisal) => (
+                      <TableRow key={appraisal.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{appraisal.employee?.name || "Unknown"}</p>
+                            <p className="text-xs text-muted-foreground">{appraisal.employee?.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-[#00C2FF]/10 text-[#00C2FF]">
+                            {appraisal.cycle?.name || `Cycle ${appraisal.cycleId}`}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{appraisal.reviewYear}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          ₹{appraisal.pastCtc.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          ₹{appraisal.currentCtc.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <TrendingUp className="h-4 w-4 text-green-500" />
+                            <span className="font-bold text-green-600">
+                              {appraisal.hikePercentage.toFixed(2)}%
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {appraisal.notes || "—"}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEditAppraisal(appraisal)}
+                              className="hover:bg-[#00C2FF]/10"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteAppraisal(appraisal.id)}
+                              className="hover:bg-red-100 text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1296,6 +1569,155 @@ export function AdminReviewDashboard() {
               className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
             >
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Appraisal Dialog */}
+      <Dialog open={isAppraisalDialogOpen} onOpenChange={setIsAppraisalDialogOpen}>
+        <DialogContent className="border-[#00C2FF]/20 max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
+              {selectedAppraisal ? "Update Appraisal" : "Add Appraisal"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedAppraisal 
+                ? "Update the appraisal details for this employee" 
+                : "Enter appraisal details after completing employee reviews"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="appraisal-employee">Employee *</Label>
+                <Select
+                  value={appraisalForm.employeeId}
+                  onValueChange={(value) => setAppraisalForm({ ...appraisalForm, employeeId: value })}
+                  disabled={selectedAppraisal !== null}
+                >
+                  <SelectTrigger className="border-[#00C2FF]/30 focus:border-[#00C2FF]">
+                    <SelectValue placeholder="Select employee" />
+                  </SelectTrigger>
+                  <SelectContent className="border-[#00C2FF]/20">
+                    {users.filter(u => u.role === "employee" || u.role === "intern").map((user) => (
+                      <SelectItem key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appraisal-cycle">Review Cycle *</Label>
+                <Select
+                  value={appraisalForm.cycleId}
+                  onValueChange={(value) => setAppraisalForm({ ...appraisalForm, cycleId: value })}
+                >
+                  <SelectTrigger className="border-[#00C2FF]/30 focus:border-[#00C2FF]">
+                    <SelectValue placeholder="Select cycle" />
+                  </SelectTrigger>
+                  <SelectContent className="border-[#00C2FF]/20">
+                    {cycles.map((cycle) => (
+                      <SelectItem key={cycle.id} value={cycle.id.toString()}>
+                        {cycle.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="appraisal-year">Review Year *</Label>
+              <Input
+                id="appraisal-year"
+                type="number"
+                min="2020"
+                max="2030"
+                value={appraisalForm.reviewYear}
+                onChange={(e) => setAppraisalForm({ ...appraisalForm, reviewYear: parseInt(e.target.value) })}
+                className="border-[#00C2FF]/30 focus:border-[#00C2FF]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="appraisal-past-ctc">Past CTC (₹) *</Label>
+                <Input
+                  id="appraisal-past-ctc"
+                  type="number"
+                  placeholder="e.g., 600000"
+                  value={appraisalForm.pastCtc}
+                  onChange={(e) => setAppraisalForm({ ...appraisalForm, pastCtc: e.target.value })}
+                  onBlur={calculateAutoHike}
+                  className="border-[#00C2FF]/30 focus:border-[#00C2FF]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="appraisal-current-ctc">Current CTC (₹) *</Label>
+                <Input
+                  id="appraisal-current-ctc"
+                  type="number"
+                  placeholder="e.g., 720000"
+                  value={appraisalForm.currentCtc}
+                  onChange={(e) => setAppraisalForm({ ...appraisalForm, currentCtc: e.target.value })}
+                  onBlur={calculateAutoHike}
+                  className="border-[#00C2FF]/30 focus:border-[#00C2FF]"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="appraisal-hike">Hike Percentage (%) *</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="appraisal-hike"
+                  type="number"
+                  step="0.01"
+                  placeholder="Auto-calculated"
+                  value={appraisalForm.hikePercentage}
+                  onChange={(e) => setAppraisalForm({ ...appraisalForm, hikePercentage: e.target.value })}
+                  className="border-[#00C2FF]/30 focus:border-[#00C2FF]"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={calculateAutoHike}
+                  className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+                >
+                  Calculate
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Will auto-calculate based on CTC values or enter manually
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="appraisal-notes">Notes</Label>
+              <Textarea
+                id="appraisal-notes"
+                placeholder="Add any notes about this appraisal..."
+                value={appraisalForm.notes}
+                onChange={(e) => setAppraisalForm({ ...appraisalForm, notes: e.target.value })}
+                className="border-[#00C2FF]/30 focus:border-[#00C2FF] min-h-20"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAppraisalDialogOpen(false)
+                setSelectedAppraisal(null)
+              }}
+              className="border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateOrUpdateAppraisal}
+              className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white"
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              {selectedAppraisal ? "Update Appraisal" : "Create Appraisal"}
             </Button>
           </DialogFooter>
         </DialogContent>

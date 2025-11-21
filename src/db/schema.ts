@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, integer, text, real } from 'drizzle-orm/sqlite-core';
 
 // Users table
 export const users = sqliteTable('users', {
@@ -23,7 +23,7 @@ export const courses = sqliteTable('courses', {
   updatedAt: text('updated_at').notNull(),
 });
 
-// Topics table
+// Topics table with hierarchical support
 export const topics = sqliteTable('topics', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   courseId: integer('course_id').references(() => courses.id),
@@ -32,6 +32,8 @@ export const topics = sqliteTable('topics', {
   videoUrl: text('video_url'),
   attachmentUrl: text('attachment_url'),
   orderIndex: integer('order_index').notNull(),
+  parentTopicId: integer('parent_topic_id').references(() => topics.id),
+  orderNumber: integer('order_number').notNull(),
   createdAt: text('created_at').notNull(),
 });
 
@@ -180,6 +182,21 @@ export const reviewNotifications = sqliteTable('review_notifications', {
   relatedId: integer('related_id'),
   isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull(),
+});
+
+// Appraisals table
+export const appraisals = sqliteTable('appraisals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  employeeId: text('employee_id').notNull().references(() => user.id),
+  cycleId: integer('cycle_id').notNull().references(() => reviewCycles.id),
+  reviewYear: integer('review_year').notNull(),
+  pastCtc: integer('past_ctc').notNull(),
+  currentCtc: integer('current_ctc').notNull(),
+  hikePercentage: real('hike_percentage').notNull(),
+  notes: text('notes'),
+  updatedBy: text('updated_by').notNull().references(() => user.id),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
 });
 
 // Auth tables for better-auth
