@@ -13,7 +13,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import Link from "next/link"
-import { GraduationCap, Loader2 } from "lucide-react"
+import Image from "next/image"
+import { Loader2 } from "lucide-react"
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -79,11 +80,16 @@ export default function LoginPage() {
       <Card className="w-full max-w-md backdrop-blur-sm bg-card/95 shadow-2xl border border-[#00C2FF]/20">
         <CardHeader className="space-y-1">
           <div className="flex items-center justify-center mb-4">
-            <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-3 rounded-full shadow-lg">
-              <GraduationCap className="h-8 w-8" />
+            <div className="relative h-16 w-16 rounded-lg overflow-hidden shadow-lg">
+              <Image
+                src="/logo.png"
+                alt="TechSonance InfoTech"
+                fill
+                className="object-contain"
+              />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">IT Training Platform</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance InfoTech</CardTitle>
           <CardDescription className="text-center">
             Sign in to access your training dashboard
           </CardDescription>

@@ -9,6 +9,11 @@ import { Toaster } from "@/components/ui/sonner";
 export const metadata: Metadata = {
   title: "TechSonance InfoTech",
   description: "Professional training platform for employees and interns - Where Innovation Finds Its Resonance",
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/logo.png',
+  },
 };
 
 export default function RootLayout({

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import { authClient, useSession } from "@/lib/auth-client"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -150,10 +151,15 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
       {/* Logo */}
       <div className="flex h-16 items-center border-b border-[#00C2FF]/20 px-6">
         <Link href="/" className="flex items-center space-x-2">
-          <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-2 rounded-lg shadow-lg">
-            <GraduationCap className="h-5 w-5" />
+          <div className="relative h-8 w-8 rounded-lg overflow-hidden shadow-lg">
+            <Image
+              src="/logo.png"
+              alt="TechSonance InfoTech"
+              fill
+              className="object-contain"
+            />
           </div>
-          <span className="font-bold text-lg bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">IT Training</span>
+          <span className="font-bold text-lg bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance</span>
         </Link>
       </div>
 
@@ -227,10 +233,15 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
           </Sheet>
 
           <div className="flex items-center space-x-2">
-            <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-2 rounded-lg shadow-lg">
-              <GraduationCap className="h-5 w-5" />
+            <div className="relative h-8 w-8 rounded-lg overflow-hidden shadow-lg">
+              <Image
+                src="/logo.png"
+                alt="TechSonance InfoTech"
+                fill
+                className="object-contain"
+              />
             </div>
-            <span className="font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">IT Training</span>
+            <span className="font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance</span>
           </div>
 
           <DropdownMenu>
