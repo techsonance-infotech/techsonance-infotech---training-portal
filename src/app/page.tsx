@@ -100,13 +100,19 @@ export default function HomePage() {
         </div>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
-            <Card key={index} className="border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-xl hover:shadow-[#00C2FF]/20 hover:-translate-y-1 animate-in fade-in slide-in-from-bottom duration-700 group" style={{ animationDelay: `${index * 100}ms` }}>
-              <CardHeader>
-                <div className="w-12 h-12 bg-gradient-to-br from-[#00C2FF]/20 to-[#0A1A2F]/20 border border-[#00C2FF]/30 text-[#00C2FF] rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                  <feature.icon className="h-6 w-6" />
+            <Card 
+              key={index} 
+              className="bg-[#0A1A2F]/60 dark:bg-[#0A1A2F]/80 border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-xl hover:shadow-[#00C2FF]/10 hover:-translate-y-1 animate-in fade-in slide-in-from-bottom duration-700 group backdrop-blur-sm" 
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              <CardHeader className="space-y-4">
+                <div className="w-12 h-12 bg-[#00C2FF]/10 border border-[#00C2FF]/40 rounded-lg flex items-center justify-center group-hover:bg-[#00C2FF]/20 group-hover:border-[#00C2FF]/60 transition-all duration-300">
+                  <feature.icon className="h-6 w-6 text-[#00C2FF]" />
                 </div>
-                <CardTitle className="group-hover:text-[#00C2FF] transition-colors duration-300">{feature.title}</CardTitle>
-                <CardDescription className="text-base">{feature.description}</CardDescription>
+                <div className="space-y-2">
+                  <CardTitle className="text-white group-hover:text-[#00C2FF] transition-colors duration-300">{feature.title}</CardTitle>
+                  <CardDescription className="text-gray-400 dark:text-gray-400">{feature.description}</CardDescription>
+                </div>
               </CardHeader>
             </Card>
           ))}
