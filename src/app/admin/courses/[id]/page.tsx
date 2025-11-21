@@ -244,7 +244,7 @@ export default function EditCoursePage() {
   const countAllTopics = (topicList: Topic[]): number => {
     let count = topicList.length
     topicList.forEach(topic => {
-      count += countAllTopics(topic.subtopics)
+      count += countAllTopics(topic.subtopics || [])
     })
     return count
   }
