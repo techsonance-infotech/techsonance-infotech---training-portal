@@ -206,6 +206,10 @@ export default function AdminOnboardingPage() {
               Review and manage employee onboarding submissions
             </p>
           </div>
+          <Button onClick={() => router.push("/admin/onboarding/new")}>
+            <UserPlus className="h-4 w-4 mr-2" />
+            New Employee
+          </Button>
         </div>
 
         {/* Stats Cards */}

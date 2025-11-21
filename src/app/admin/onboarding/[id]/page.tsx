@@ -32,7 +32,8 @@ import {
   Laptop,
   FileText,
   Calendar,
-  Clock
+  Clock,
+  Edit
 } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
@@ -293,6 +294,13 @@ export default function OnboardingDetailPage() {
               <>
                 <Button
                   variant="outline"
+                  onClick={() => router.push(`/admin/onboarding/${submission.id}/edit`)}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => {
                     setActionType("reject")
                     setActionDialogOpen(true)
@@ -311,6 +319,15 @@ export default function OnboardingDetailPage() {
                   Approve
                 </Button>
               </>
+            )}
+            {(submission.status === "approved" || submission.status === "rejected") && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/admin/onboarding/${submission.id}/edit`)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Button>
             )}
           </div>
         </div>
