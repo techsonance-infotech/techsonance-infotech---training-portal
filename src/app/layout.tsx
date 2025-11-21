@@ -7,8 +7,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 export const metadata: Metadata = {
-  title: "IT Training Platform",
-  description: "Professional training platform for employees and interns",
+  title: "TechSonance InfoTech",
+  description: "Professional training platform for employees and interns - Where Innovation Finds Its Resonance",
 };
 
 export default function RootLayout({

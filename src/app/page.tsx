@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { GraduationCap, BookOpen, Users, Award, TrendingUp, Shield } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 
 export default function HomePage() {
   const router = useRouter()
@@ -47,11 +48,16 @@ export default function HomePage() {
       {/* Header */}
       <header className="border-b border-[#00C2FF]/20 bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-sm sticky top-0 z-50 animate-in fade-in slide-in-from-top duration-500">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-2 rounded-lg shadow-lg animate-in zoom-in duration-500">
-              <GraduationCap className="h-6 w-6" />
+          <div className="flex items-center space-x-3">
+            <div className="relative h-10 w-10 rounded-lg overflow-hidden shadow-lg animate-in zoom-in duration-500">
+              <Image
+                src="/logo.png"
+                alt="TechSonance InfoTech"
+                fill
+                className="object-contain"
+              />
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">IT Training Platform</span>
+            <span className="text-xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance InfoTech</span>
           </div>
           <div className="flex items-center space-x-4">
             <Button variant="ghost" asChild className="hover:bg-[#00C2FF]/10 hover:text-[#00C2FF] transition-all duration-300">
@@ -69,7 +75,7 @@ export default function HomePage() {
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="inline-block animate-in zoom-in duration-500 delay-100">
             <span className="px-4 py-2 bg-gradient-to-r from-[#00C2FF]/20 to-[#0A1A2F]/20 border border-[#00C2FF]/30 text-[#00C2FF] rounded-full text-sm font-medium">
-              Professional Development
+              Where Innovation Finds Its Resonance
             </span>
           </div>
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight animate-in slide-in-from-bottom duration-700 delay-200">
@@ -160,14 +166,19 @@ export default function HomePage() {
       <footer className="border-t border-[#00C2FF]/20 bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-sm">
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center space-x-2">
-              <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-2 rounded-lg shadow-lg">
-                <GraduationCap className="h-5 w-5" />
+            <div className="flex items-center space-x-3">
+              <div className="relative h-8 w-8 rounded-lg overflow-hidden shadow-lg">
+                <Image
+                  src="/logo.png"
+                  alt="TechSonance InfoTech"
+                  fill
+                  className="object-contain"
+                />
               </div>
-              <span className="font-semibold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">IT Training Platform</span>
+              <span className="font-semibold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance InfoTech</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              © 2024 IT Training Platform. All rights reserved.
+              © 2024 TechSonance InfoTech. All rights reserved.
             </p>
           </div>
         </div>
