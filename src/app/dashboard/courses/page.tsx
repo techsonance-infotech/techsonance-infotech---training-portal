@@ -1,28 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { PageLoader } from "@/components/ui/loading-spinner"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { BookOpen, Search, Calendar, Clock, Video, FileText, ChevronRight, ExternalLink } from "lucide-react"
+import { BookOpen, Search, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 
 interface Course {
@@ -31,27 +17,6 @@ interface Course {
   description: string
   startDate: string
   endDate: string
-}
-
-interface Topic {
-  id: number
-  courseId: number
-  title: string
-  content: string
-  videoUrl: string | null
-  attachmentUrl: string | null
-  orderIndex: number
-  parentTopicId: number | null
-  orderNumber: number
-}
-
-interface Activity {
-  id: number
-  courseId: number
-  title: string
-  type: string
-  description: string
-  scheduledDate: string
 }
 
 interface Assignment {
@@ -63,15 +28,11 @@ interface Assignment {
 }
 
 export default function EmployeeCoursesPage() {
+  const router = useRouter()
   const [courses, setCourses] = useState<Course[]>([])
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
-  const [topics, setTopics] = useState<Topic[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
 
   useEffect(() => {
     fetchCourses()
@@ -100,39 +61,8 @@ export default function EmployeeCoursesPage() {
     }
   }
 
-  const fetchCourseDetails = async (courseId: number) => {
-    try {
-      const [topicsRes, activitiesRes] = await Promise.all([
-        fetch(`/api/courses/${courseId}/topics`),
-        fetch(`/api/courses/${courseId}/activities`),
-      ])
-      const topicsData = await topicsRes.json()
-      const activitiesData = await activitiesRes.json()
-      setTopics(topicsData)
-      setActivities(activitiesData)
-    } catch (error) {
-      toast.error("Failed to load course details")
-    }
-  }
-
-  const handleCourseClick = async (course: Course) => {
-    setSelectedCourse(course)
-    setIsDialogOpen(true)
-    await fetchCourseDetails(course.id)
-  }
-
-  const handleTopicClick = (topic: Topic) => {
-    setSelectedTopic(topic)
-  }
-
-  const getTopicHierarchy = () => {
-    const mainTopics = topics.filter(t => !t.parentTopicId).sort((a, b) => a.orderNumber - b.orderNumber)
-    return mainTopics.map(mainTopic => ({
-      ...mainTopic,
-      subtopics: topics
-        .filter(t => t.parentTopicId === mainTopic.id)
-        .sort((a, b) => a.orderNumber - b.orderNumber)
-    }))
+  const handleCourseClick = (courseId: number) => {
+    router.push(`/dashboard/courses/${courseId}`)
   }
 
   const getCourseProgress = (courseId: number) => {
@@ -155,15 +85,6 @@ export default function EmployeeCoursesPage() {
       month: "short",
       day: "numeric",
       year: "numeric",
-    })
-  }
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
     })
   }
 
@@ -245,16 +166,12 @@ export default function EmployeeCoursesPage() {
             {filteredCourses.map((course) => {
               const progress = getCourseProgress(course.id)
               const status = getCourseStatus(course.id)
-              const startDate = new Date(course.startDate)
-              const endDate = new Date(course.endDate)
-              const now = new Date()
-              const isActive = now >= startDate && now <= endDate
 
               return (
                 <Card
                   key={course.id}
                   className="border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-lg hover:shadow-[#00C2FF]/20 hover:-translate-y-1 cursor-pointer group"
-                  onClick={() => handleCourseClick(course)}
+                  onClick={() => handleCourseClick(course.id)}
                 >
                   <CardHeader>
                     <div className="flex items-start justify-between mb-2">
@@ -304,217 +221,6 @@ export default function EmployeeCoursesPage() {
             })}
           </div>
         )}
-
-        {/* Course Details Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="text-2xl">{selectedCourse?.title}</DialogTitle>
-              <DialogDescription>
-                {selectedCourse?.description}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedCourse && (
-              <Tabs defaultValue="topics" className="mt-4">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="topics">Topics ({topics.length})</TabsTrigger>
-                  <TabsTrigger value="activities">Activities ({activities.length})</TabsTrigger>
-                </TabsList>
-
-                {/* Topics Tab */}
-                <TabsContent value="topics" className="space-y-4 mt-4">
-                  {topics.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No topics available yet</p>
-                    </div>
-                  ) : selectedTopic ? (
-                    // Topic Detail View
-                    <div className="space-y-4">
-                      <Button
-                        variant="ghost"
-                        onClick={() => setSelectedTopic(null)}
-                        className="mb-4"
-                      >
-                        ← Back to Topics
-                      </Button>
-                      <Card className="border-[#00C2FF]/20">
-                        <CardHeader>
-                          <CardTitle>{selectedTopic.title}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div 
-                            className="prose prose-sm max-w-none dark:prose-invert"
-                            dangerouslySetInnerHTML={{ __html: selectedTopic.content }}
-                          />
-                          {(selectedTopic.videoUrl || selectedTopic.attachmentUrl) && (
-                            <div className="flex gap-2 pt-4 border-t">
-                              {selectedTopic.videoUrl && (
-                                <Button variant="outline" asChild>
-                                  <a href={selectedTopic.videoUrl} target="_blank" rel="noopener noreferrer">
-                                    <Video className="h-4 w-4 mr-2" />
-                                    Watch Video
-                                    <ExternalLink className="h-3 w-3 ml-2" />
-                                  </a>
-                                </Button>
-                              )}
-                              {selectedTopic.attachmentUrl && (
-                                <Button variant="outline" asChild>
-                                  <a href={selectedTopic.attachmentUrl} target="_blank" rel="noopener noreferrer">
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    View Attachment
-                                    <ExternalLink className="h-3 w-3 ml-2" />
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
-                    </div>
-                  ) : (
-                    // Topics List with Hierarchy
-                    <Accordion type="single" collapsible className="space-y-2">
-                      {getTopicHierarchy().map((topic) => (
-                        <AccordionItem
-                          key={topic.id}
-                          value={`topic-${topic.id}`}
-                          className="border border-[#00C2FF]/20 rounded-lg px-4"
-                        >
-                          <AccordionTrigger className="hover:no-underline">
-                            <div className="flex items-center gap-3 text-left">
-                              <div className="bg-primary/10 text-primary px-3 py-1 rounded-lg font-semibold text-sm">
-                                {topic.orderNumber}
-                              </div>
-                              <div>
-                                <h4 className="font-semibold">{topic.title}</h4>
-                                {topic.subtopics.length > 0 && (
-                                  <p className="text-xs text-muted-foreground">
-                                    {topic.subtopics.length} subtopic{topic.subtopics.length !== 1 ? 's' : ''}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="space-y-2 pt-4">
-                            {/* Main Topic Content Preview */}
-                            <div
-                              className="p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
-                              onClick={() => handleTopicClick(topic)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex-1">
-                                  <div 
-                                    className="text-sm text-muted-foreground line-clamp-2 prose prose-sm max-w-none"
-                                    dangerouslySetInnerHTML={{ __html: topic.content }}
-                                  />
-                                  <div className="flex items-center gap-2 mt-2">
-                                    {topic.videoUrl && (
-                                      <Badge variant="outline" className="text-xs">
-                                        <Video className="h-3 w-3 mr-1" />
-                                        Video
-                                      </Badge>
-                                    )}
-                                    {topic.attachmentUrl && (
-                                      <Badge variant="outline" className="text-xs">
-                                        <FileText className="h-3 w-3 mr-1" />
-                                        Attachment
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </div>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                            </div>
-
-                            {/* Subtopics */}
-                            {topic.subtopics.length > 0 && (
-                              <div className="ml-4 space-y-2 border-l-2 border-primary/20 pl-4">
-                                {topic.subtopics.map((subtopic) => (
-                                  <div
-                                    key={subtopic.id}
-                                    className="p-3 bg-muted/30 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-                                    onClick={() => handleTopicClick(subtopic)}
-                                  >
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center gap-2 flex-1">
-                                        <div className="bg-primary/10 text-primary px-2 py-1 rounded text-xs font-semibold">
-                                          {topic.orderNumber}.{subtopic.orderNumber}
-                                        </div>
-                                        <div className="flex-1">
-                                          <h5 className="font-medium text-sm">{subtopic.title}</h5>
-                                          <div className="flex items-center gap-2 mt-1">
-                                            {subtopic.videoUrl && (
-                                              <Badge variant="outline" className="text-xs">
-                                                <Video className="h-3 w-3 mr-1" />
-                                                Video
-                                              </Badge>
-                                            )}
-                                            {subtopic.attachmentUrl && (
-                                              <Badge variant="outline" className="text-xs">
-                                                <FileText className="h-3 w-3 mr-1" />
-                                                Attachment
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  )}
-                </TabsContent>
-
-                {/* Activities Tab */}
-                <TabsContent value="activities" className="space-y-4 mt-4">
-                  {activities.length === 0 ? (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No activities scheduled yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {activities.map((activity) => (
-                        <Card key={activity.id} className="border-[#00C2FF]/20">
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <div className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white p-2 rounded-lg">
-                                <Clock className="h-5 w-5" />
-                              </div>
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold">{activity.title}</h4>
-                                  <Badge variant="outline" className="border-[#00C2FF]/30">
-                                    {activity.type}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {activity.description}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  <Calendar className="h-3 w-3 inline mr-1" />
-                                  {formatDateTime(activity.scheduledDate)}
-                                </p>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
     </DashboardLayout>
   )
