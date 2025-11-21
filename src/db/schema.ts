@@ -264,3 +264,88 @@ export const verification = sqliteTable("verification", {
     () => new Date(),
   ),
 });
+
+// Add employee onboarding table at the end
+export const employeeOnboarding = sqliteTable('employee_onboarding', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  
+  // Core fields
+  status: text('status').notNull().default('pending'), // 'pending', 'in_review', 'approved', 'rejected'
+  submittedAt: text('submitted_at').notNull(),
+  reviewedBy: text('reviewed_by').references(() => user.id),
+  reviewedAt: text('reviewed_at'),
+  
+  // Section 1: Personal Information
+  fullName: text('full_name').notNull(),
+  dateOfBirth: text('date_of_birth').notNull(),
+  gender: text('gender').notNull(),
+  personalEmail: text('personal_email').notNull(),
+  personalPhone: text('personal_phone').notNull(),
+  currentAddress: text('current_address').notNull(),
+  permanentAddress: text('permanent_address'),
+  emergencyContactName: text('emergency_contact_name').notNull(),
+  emergencyContactRelationship: text('emergency_contact_relationship').notNull(),
+  emergencyContactPhone: text('emergency_contact_phone').notNull(),
+  
+  // Section 2: Identity & Verification
+  aadhaarNumber: text('aadhaar_number').notNull(),
+  panNumber: text('pan_number').notNull(),
+  aadhaarUploadUrl: text('aadhaar_upload_url'),
+  panUploadUrl: text('pan_upload_url'),
+  passportUploadUrl: text('passport_upload_url'),
+  photoUploadUrl: text('photo_upload_url').notNull(),
+  
+  // Section 3: Employment Details
+  jobTitle: text('job_title').notNull(),
+  department: text('department'),
+  reportingManager: text('reporting_manager'),
+  dateOfJoining: text('date_of_joining').notNull(),
+  employmentType: text('employment_type').notNull(),
+  workLocation: text('work_location').notNull(),
+  
+  // Section 4: Educational & Skill Details
+  highestQualification: text('highest_qualification'),
+  degreeCertificateUrl: text('degree_certificate_url'),
+  technicalSkills: text('technical_skills', { mode: 'json' }),
+  certificationsUrls: text('certifications_urls', { mode: 'json' }),
+  
+  // Section 5: Previous Employment
+  previousCompany: text('previous_company'),
+  previousJobTitle: text('previous_job_title'),
+  totalExperience: text('total_experience'),
+  experienceLetterUrl: text('experience_letter_url'),
+  uanNumber: text('uan_number'),
+  lastSalarySlipUrl: text('last_salary_slip_url'),
+  
+  // Section 6: Bank Details
+  bankAccountNumber: text('bank_account_number').notNull(),
+  ifscCode: text('ifsc_code').notNull(),
+  bankNameBranch: text('bank_name_branch').notNull(),
+  cancelledChequeUrl: text('cancelled_cheque_url').notNull(),
+  
+  // Section 7: Tax Information
+  taxRegime: text('tax_regime').notNull(),
+  investmentProofsUrl: text('investment_proofs_url'),
+  
+  // Section 8: IT & System Setup
+  laptopRequired: text('laptop_required').notNull(),
+  softwareAccess: text('software_access', { mode: 'json' }),
+  tshirtSize: text('tshirt_size'),
+  
+  // Section 9: Policy Agreements
+  policyAgreements: text('policy_agreements', { mode: 'json' }).notNull(),
+  signature: text('signature').notNull(),
+  
+  // Section 10: Additional Information
+  bloodGroup: text('blood_group'),
+  linkedinProfile: text('linkedin_profile'),
+  specialAccommodations: text('special_accommodations'),
+  aboutYourself: text('about_yourself'),
+  workPreferences: text('work_preferences', { mode: 'json' }),
+  careerGoals: text('career_goals'),
+  hobbies: text('hobbies'),
+  
+  // Timestamps
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});

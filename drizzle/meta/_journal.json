@@ -36,6 +36,13 @@
       "when": 1763708058934,
       "tag": "0004_robust_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1763724640742,
+      "tag": "0005_salty_vampiro",
+      "breakpoints": true
     }
   ]
 }

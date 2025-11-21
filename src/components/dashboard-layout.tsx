@@ -117,6 +117,12 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
       icon: Users,
       roles: ["admin"],
     },
+    {
+      name: "Onboarding",
+      href: "/admin/onboarding",
+      icon: UserCog,
+      roles: ["admin"],
+    },
   ]
 
   const filteredNavigation = navigation.filter((item) =>
