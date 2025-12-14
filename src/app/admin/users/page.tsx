@@ -86,7 +86,7 @@ export default function UsersManagementPage() {
 
       const response = await fetch(`/api/users?${params.toString()}`)
       if (!response.ok) throw new Error("Failed to fetch users")
-      
+
       const data = await response.json()
       setUsers(data)
     } catch (error) {
@@ -101,10 +101,21 @@ export default function UsersManagementPage() {
     setIsSubmitting(true)
 
     try {
+      // Split full name into first and last name
+      const nameParts = formData.name.trim().split(/\s+/)
+      const firstName = nameParts[0]
+      const lastName = nameParts.slice(1).join(" ") || "." // Fallback for single names
+
       const response = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+        }),
       })
 
       const data = await response.json()

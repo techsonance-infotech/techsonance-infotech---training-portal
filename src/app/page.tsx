@@ -2,187 +2,215 @@
 
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { GraduationCap, BookOpen, Users, Award, TrendingUp, Shield } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  Play,
+  Calendar,
+  Mail,
+  User,
+  Users,
+  BarChart,
+  CheckCircle2,
+  TrendingUp,
+  BookOpen,
+  Award,
+  Video
+} from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { motion } from "framer-motion"
+import { StatsSection } from "@/components/landing/StatsSection"
+import { ServicesSection } from "@/components/landing/ServicesSection"
+import { AboutSection } from "@/components/landing/AboutSection"
+import { FeaturesSection } from "@/components/landing/FeaturesSection"
+import { CoursesSection } from "@/components/landing/CoursesSection"
+import { TestimonialSection } from "@/components/landing/TestimonialSection"
+import { NewsSection } from "@/components/landing/NewsSection"
+import { Footer } from "@/components/landing/Footer"
+
+import { Navbar } from "@/components/Navbar"
 
 export default function HomePage() {
   const router = useRouter()
 
-  const features = [
-    {
-      icon: BookOpen,
-      title: "Comprehensive Courses",
-      description: "Access 13+ specialized training tracks from .NET to AI",
-    },
-    {
-      icon: Users,
-      title: "Peer Feedback",
-      description: "Annual performance reviews and skill evaluations",
-    },
-    {
-      icon: Award,
-      title: "Portfolio Builder",
-      description: "Build and showcase your professional skills and certifications",
-    },
-    {
-      icon: TrendingUp,
-      title: "Progress Tracking",
-      description: "Monitor your learning journey with detailed analytics",
-    },
-    {
-      icon: Shield,
-      title: "Company Policies",
-      description: "Stay compliant with required training and policies",
-    },
-    {
-      icon: GraduationCap,
-      title: "Expert-Led Training",
-      description: "Learn from industry professionals and mentors",
-    },
-  ]
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { duration: 0.8, staggerChildren: 0.2 } }
+  }
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
+  }
+
+  const floatingCardVariants = {
+    animate: {
+      y: [0, -10, 0],
+      transition: {
+        duration: 4,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00C2FF]/20 via-[#0A1A2F]/40 to-[#0A1A2F] dark:from-[#0A1A2F] dark:via-[#00C2FF]/10 dark:to-[#0A1A2F]">
-      {/* Header */}
-      <header className="border-b border-[#00C2FF]/20 bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-sm sticky top-0 z-50 animate-in fade-in slide-in-from-top duration-500">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="relative h-10 w-10 rounded-lg overflow-hidden shadow-lg animate-in zoom-in duration-500">
-              <Image
-                src="/logo.png"
-                alt="TechSonance InfoTech"
-                fill
-                className="object-contain"
-              />
-            </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance InfoTech</span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" asChild className="hover:bg-[#00C2FF]/10 hover:text-[#00C2FF] transition-all duration-300">
-              <Link href="/login">Login</Link>
-            </Button>
-            <Button asChild className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <Link href="/login">Get Started</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-[#F0F8FF] dark:bg-[#0A1A2F] overflow-x-hidden font-sans relative">
+      {/* Navbar */}
+      {/* Navbar */}
+      <Navbar />
 
       {/* Hero Section */}
-      <section className="container mx-auto px-4 py-20 text-center animate-in fade-in slide-in-from-bottom duration-700">
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="inline-block animate-in zoom-in duration-500 delay-100">
-            <span className="px-4 py-2 bg-gradient-to-r from-[#00C2FF]/20 to-[#0A1A2F]/20 border border-[#00C2FF]/30 text-[#00C2FF] rounded-full text-sm font-medium">
-              Where Innovation Finds Its Resonance
-            </span>
-          </div>
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight animate-in slide-in-from-bottom duration-700 delay-200">
-            Empower Your Career with
-            <span className="block bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent mt-2">Expert Training</span>
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-in fade-in duration-700 delay-300">
-            Access world-class training programs, build your professional portfolio, and grow your skills with our comprehensive IT training platform.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 animate-in fade-in slide-in-from-bottom duration-700 delay-400">
-            <Button size="lg" asChild className="text-lg bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <Link href="/login">Start Learning Today</Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild className="text-lg border-[#00C2FF]/30 hover:border-[#00C2FF] hover:bg-[#00C2FF]/10 transition-all duration-300">
-              <Link href="/login">Sign In</Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      <div className="bg-[#ecf9ff] dark:bg-[#0A1A2F]/50 relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden">
+        {/* Decorative Circle */}
+        <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-[#00C2FF]/5 rounded-full blur-3xl rounded-full" />
 
-      {/* Features Grid */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="text-center mb-12 animate-in fade-in slide-in-from-bottom duration-700">
-          <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">Everything You Need to Succeed</h2>
-          <p className="text-muted-foreground text-lg">
-            Comprehensive tools and resources for professional development
-          </p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <Card 
-              key={index} 
-              className="bg-[#0A1A2F]/60 dark:bg-[#0A1A2F]/80 border-[#00C2FF]/20 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-xl hover:shadow-[#00C2FF]/10 hover:-translate-y-1 animate-in fade-in slide-in-from-bottom duration-700 group backdrop-blur-sm" 
-              style={{ animationDelay: `${index * 100}ms` }}
+        <div className="container mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center relative z-10">
+          {/* Text Content */}
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            className="space-y-8"
+          >
+            <motion.h1
+              variants={itemVariants}
+              className="text-5xl lg:text-6xl font-black text-[#0A1A2F] dark:text-white leading-[1.1]"
             >
-              <CardHeader className="space-y-4">
-                <div className="w-12 h-12 bg-[#00C2FF]/10 border border-[#00C2FF]/40 rounded-lg flex items-center justify-center group-hover:bg-[#00C2FF]/20 group-hover:border-[#00C2FF]/60 transition-all duration-300">
-                  <feature.icon className="h-6 w-6 text-[#00C2FF]" />
-                </div>
-                <div className="space-y-2">
-                  <CardTitle className="text-white group-hover:text-[#00C2FF] transition-colors duration-300">{feature.title}</CardTitle>
-                  <CardDescription className="text-gray-400 dark:text-gray-400">{feature.description}</CardDescription>
-                </div>
-              </CardHeader>
-            </Card>
-          ))}
-        </div>
-      </section>
+              <span className="text-[#F48C06]">Studying</span> Online is now much easier
+            </motion.h1>
 
-      {/* Stats Section */}
-      <section className="container mx-auto px-4 py-20 animate-in fade-in slide-in-from-bottom duration-700">
-        <Card className="bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] text-white border-none shadow-2xl hover:shadow-[#00C2FF]/50 transition-all duration-500">
-          <CardContent className="py-12">
-            <div className="grid md:grid-cols-3 gap-8 text-center">
-              <div className="animate-in zoom-in duration-500 delay-100">
-                <div className="text-4xl font-bold mb-2">13+</div>
-                <div className="text-white/80">Training Tracks</div>
+            <motion.p
+              variants={itemVariants}
+              className="text-lg text-[#0A1A2F]/60 dark:text-white/60 max-w-md leading-relaxed"
+            >
+              TechSonance is an interesting platform that will teach you in more an interactive way
+            </motion.p>
+
+            <motion.div variants={itemVariants} className="flex flex-col sm:flex-row items-center gap-6">
+              <Button className="h-14 px-8 rounded-full bg-[#00C2FF] hover:bg-[#00a0d6] text-white text-lg shadow-xl shadow-[#00C2FF]/30 transition-transform hover:scale-105">
+                <Link href="/login">Join for free</Link>
+              </Button>
+
+              <div className="flex items-center gap-4 cursor-pointer group">
+                <div className="w-14 h-14 bg-white rounded-full shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Play className="w-6 h-6 text-[#00C2FF] fill-current ml-1" />
+                </div>
+                <span className="text-[#0A1A2F] dark:text-white font-medium group-hover:text-[#00C2FF] transition-colors">Watch how it works</span>
               </div>
-              <div className="animate-in zoom-in duration-500 delay-200">
-                <div className="text-4xl font-bold mb-2">6</div>
-                <div className="text-white/80">Company Policies</div>
-              </div>
-              <div className="animate-in zoom-in duration-500 delay-300">
-                <div className="text-4xl font-bold mb-2">100%</div>
-                <div className="text-white/80">Career Growth</div>
+            </motion.div>
+          </motion.div>
+
+          {/* Image & Floating Cards */}
+          <div className="relative h-[600px] hidden lg:block">
+            {/* Main Student Image Placeholder */}
+            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-[90%] z-0">
+              {/* Assuming we don't have the exact girl image, using a placeholder gradient/frame or a generic illustration */}
+              <div className="w-full h-full bg-gradient-to-b from-[#00C2FF]/20 to-[#0A1A2F]/20 rounded-t-[3rem] relative overflow-hidden backdrop-blur-sm border border-white/20">
+                <div className="absolute inset-0 flex items-center justify-center text-[#00C2FF]/20">
+                  {/* Placeholder for the student image */}
+                  <Image
+                    src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&q=80&w=1740"
+                    alt="Student"
+                    fill
+                    className="object-cover opacity-90 mix-blend-overlay hover:mix-blend-normal transition-all duration-700 hover:scale-105"
+                  />
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </section>
 
-      {/* CTA Section */}
-      <section className="container mx-auto px-4 py-20 animate-in fade-in slide-in-from-bottom duration-700">
-        <Card className="border-2 border-[#00C2FF]/30 hover:border-[#00C2FF]/50 transition-all duration-300 hover:shadow-xl hover:shadow-[#00C2FF]/20">
-          <CardContent className="py-12 text-center">
-            <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">Ready to Start Your Journey?</h2>
-            <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
-              Join our IT training platform today and unlock access to expert-led courses, portfolio tools, and career development resources.
-            </p>
-            <Button size="lg" asChild className="text-lg bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] hover:from-[#00C2FF]/90 hover:to-[#0A1A2F]/90 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-              <Link href="/login">Sign In to Get Started</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
+            {/* Float Card 1: 250k Students */}
+            <motion.div
+              variants={floatingCardVariants}
+              animate="animate"
+              className="absolute top-20 left-0 z-20"
+            >
+              <Card className="bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-md border border-white/40 shadow-xl rounded-2xl p-2 w-64">
+                <div className="flex items-center gap-4 p-2">
+                  <div className="w-12 h-12 bg-[#00C2FF] rounded-lg flex items-center justify-center text-white">
+                    <Calendar className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[#0A1A2F] dark:text-white">250k</h3>
+                    <p className="text-sm text-gray-500">Assisted Student</p>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
 
-      {/* Footer */}
-      <footer className="border-t border-[#00C2FF]/20 bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="relative h-8 w-8 rounded-lg overflow-hidden shadow-lg">
-                <Image
-                  src="/logo.png"
-                  alt="TechSonance InfoTech"
-                  fill
-                  className="object-contain"
-                />
+            {/* Float Card 2: Congratulations */}
+            <motion.div
+              variants={floatingCardVariants}
+              animate="animate"
+              transition={{ delay: 1 }}
+              className="absolute bottom-40 right-[-20px] z-20"
+            >
+              <Card className="bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-md border border-white/40 shadow-xl rounded-2xl p-4 w-72">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#F48C06] rounded-lg flex items-center justify-center text-white shrink-0">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-[#0A1A2F] dark:text-white">Congratulations</h3>
+                    <p className="text-xs text-gray-500">Your admission completed</p>
+                  </div>
+                  <CheckCircle2 className="w-5 h-5 text-green-500 ml-auto" />
+                </div>
+              </Card>
+            </motion.div>
+
+            {/* Float Card 3: User Experience Class */}
+            <motion.div
+              variants={floatingCardVariants}
+              animate="animate"
+              transition={{ delay: 2 }}
+              className="absolute bottom-10 left-[-40px] z-20"
+            >
+              <Card className="bg-white/80 dark:bg-[#0A1A2F]/80 backdrop-blur-md border border-white/40 shadow-xl rounded-2xl p-4 w-64">
+                <div className="flex gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden relative">
+                    <User className="absolute inset-0 m-auto text-gray-500" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-[#0A1A2F] dark:text-white">User Experience Class</h4>
+                    <p className="text-xs text-gray-500">Today at 12.00 PM</p>
+                  </div>
+                </div>
+                <Button className="w-full rounded-full bg-[#E51B75] hover:bg-[#c91666] text-white text-xs h-8">
+                  Join Now
+                </Button>
+              </Card>
+            </motion.div>
+
+            {/* Floating Icon */}
+            <motion.div
+              animate={{ y: [-10, 10, -10], rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 5, repeat: Infinity }}
+              className="absolute top-40 right-10 z-10"
+            >
+              <div className="w-12 h-12 bg-[#E51B75] rounded-xl flex items-center justify-center shadow-lg transform rotate-12">
+                <BarChart className="text-white w-6 h-6" />
               </div>
-              <span className="font-semibold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">TechSonance InfoTech</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              © 2024 TechSonance InfoTech. All rights reserved.
-            </p>
+            </motion.div>
           </div>
         </div>
-      </footer>
+
+        {/* Bottom Wave (SVG) */}
+        <div className="hidden lg:block absolute bottom-0 left-0 w-full leading-none z-0">
+          <svg className="block w-full h-[150px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" preserveAspectRatio="none">
+            <path fill="#00C2FF" fillOpacity="0.1" d="M0,96L48,112C96,128,192,160,288,186.7C384,213,480,235,576,213.3C672,192,768,128,864,128C960,128,1056,192,1152,208C1248,224,1344,192,1392,176L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+          </svg>
+        </div>
+      </div>
+
+      <StatsSection />
+      <ServicesSection />
+      <AboutSection />
+      <FeaturesSection />
+      <CoursesSection />
+      <TestimonialSection />
+      <NewsSection />
+      <Footer />
     </div>
   )
 }

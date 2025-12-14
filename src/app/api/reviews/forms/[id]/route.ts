@@ -1,28 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewForms, reviewCycles, user, reviewerAssignments, reviewNotifications } from '@/db/schema';
+import { reviewForms, reviewCycles, users, reviewerAssignments, reviewNotifications } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Authentication required',
-        code: 'AUTHENTICATION_REQUIRED' 
+        code: 'AUTHENTICATION_REQUIRED'
       }, { status: 401 });
     }
 
     const { id } = await params;
     const formId = id;
     if (!formId || isNaN(parseInt(formId))) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Valid form ID is required',
-        code: 'INVALID_FORM_ID' 
+        code: 'INVALID_FORM_ID'
       }, { status: 400 });
     }
 
@@ -47,20 +47,20 @@ export async function GET(
       cycleStatus: reviewCycles.status,
       cycleStartDate: reviewCycles.startDate,
       cycleEndDate: reviewCycles.endDate,
-      employeeName: user.name,
-      employeeEmail: user.email,
-      employeeRole: user.role,
+      employeeName: users.name,
+      employeeEmail: users.email,
+      employeeRole: users.role,
     })
-    .from(reviewForms)
-    .leftJoin(reviewCycles, eq(reviewForms.cycleId, reviewCycles.id))
-    .leftJoin(user, eq(reviewForms.employeeId, user.id))
-    .where(eq(reviewForms.id, parseInt(formId)))
-    .limit(1);
+      .from(reviewForms)
+      .leftJoin(reviewCycles, eq(reviewForms.cycleId, reviewCycles.id))
+      .leftJoin(users, eq(reviewForms.employeeId, users.id))
+      .where(eq(reviewForms.id, parseInt(formId)))
+      .limit(1);
 
     if (form.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Review form not found',
-        code: 'FORM_NOT_FOUND' 
+        code: 'FORM_NOT_FOUND'
       }, { status: 404 });
     }
 
@@ -68,14 +68,14 @@ export async function GET(
 
     // Get reviewer details
     const reviewer = await db.select({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
     })
-    .from(user)
-    .where(eq(user.id, formData.reviewerId))
-    .limit(1);
+      .from(users)
+      .where(eq(users.id, formData.reviewerId))
+      .limit(1);
 
     // Access control
     const userRole = currentUser.role?.toLowerCase();
@@ -84,9 +84,9 @@ export async function GET(
     const isEmployee = currentUser.id === formData.employeeId;
 
     if (!isAdminOrHR && !isReviewer && !isEmployee) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'You do not have permission to access this review form',
-        code: 'PERMISSION_DENIED' 
+        code: 'PERMISSION_DENIED'
       }, { status: 403 });
     }
 
@@ -127,8 +127,8 @@ export async function GET(
 
   } catch (error) {
     console.error('GET review form error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + (error as Error).message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + (error as Error).message
     }, { status: 500 });
   }
 }
@@ -138,32 +138,32 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Authentication required',
-        code: 'AUTHENTICATION_REQUIRED' 
+        code: 'AUTHENTICATION_REQUIRED'
       }, { status: 401 });
     }
 
     const { id } = await params;
     const formId = id;
     if (!formId || isNaN(parseInt(formId))) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Valid form ID is required',
-        code: 'INVALID_FORM_ID' 
+        code: 'INVALID_FORM_ID'
       }, { status: 400 });
     }
 
     const body = await request.json();
-    const { 
-      status, 
-      overallRating, 
-      goalsAchievement, 
-      strengths, 
-      improvements, 
-      kpiScores, 
-      additionalComments 
+    const {
+      status,
+      overallRating,
+      goalsAchievement,
+      strengths,
+      improvements,
+      kpiScores,
+      additionalComments
     } = body;
 
     // Validate form exists
@@ -175,15 +175,15 @@ export async function PUT(
       status: reviewForms.status,
       cycleStatus: reviewCycles.status,
     })
-    .from(reviewForms)
-    .leftJoin(reviewCycles, eq(reviewForms.cycleId, reviewCycles.id))
-    .where(eq(reviewForms.id, parseInt(formId)))
-    .limit(1);
+      .from(reviewForms)
+      .leftJoin(reviewCycles, eq(reviewForms.cycleId, reviewCycles.id))
+      .where(eq(reviewForms.id, parseInt(formId)))
+      .limit(1);
 
     if (existingForm.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Review form not found',
-        code: 'FORM_NOT_FOUND' 
+        code: 'FORM_NOT_FOUND'
       }, { status: 404 });
     }
 
@@ -195,26 +195,26 @@ export async function PUT(
     const isReviewer = currentUser.id === formData.reviewerId;
 
     if (!isAdminOrHR && !isReviewer) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'You do not have permission to update this review form',
-        code: 'PERMISSION_DENIED' 
+        code: 'PERMISSION_DENIED'
       }, { status: 403 });
     }
 
     // Check if cycle is locked
     if (formData.cycleStatus === 'locked' || formData.cycleStatus === 'completed') {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Cannot update review form for a locked or completed cycle',
-        code: 'CYCLE_LOCKED' 
+        code: 'CYCLE_LOCKED'
       }, { status: 400 });
     }
 
     // Validate overallRating if provided
     if (overallRating !== undefined && overallRating !== null) {
       if (!Number.isInteger(overallRating) || overallRating < 1 || overallRating > 5) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Overall rating must be an integer between 1 and 5',
-          code: 'INVALID_RATING' 
+          code: 'INVALID_RATING'
         }, { status: 400 });
       }
     }
@@ -250,21 +250,21 @@ export async function PUT(
     }
 
     // Check if status is being changed to submitted
-    const isSubmitting = status === 'submitted' && 
-                        (formData.status === 'pending' || formData.status === 'draft');
+    const isSubmitting = status === 'submitted' &&
+      (formData.status === 'pending' || formData.status === 'draft');
 
     if (isSubmitting) {
       // Validate required fields
       const currentData = existingForm[0];
       const finalData = { ...currentData, ...updateData };
 
-      if (!finalData.overallRating || 
-          !finalData.goalsAchievement || 
-          !finalData.strengths || 
-          !finalData.improvements) {
-        return NextResponse.json({ 
+      if (!finalData.overallRating ||
+        !finalData.goalsAchievement ||
+        !finalData.strengths ||
+        !finalData.improvements) {
+        return NextResponse.json({
           error: 'All required fields must be completed before submitting (overallRating, goalsAchievement, strengths, improvements)',
-          code: 'INCOMPLETE_FORM' 
+          code: 'INCOMPLETE_FORM'
         }, { status: 400 });
       }
 
@@ -303,9 +303,9 @@ export async function PUT(
       .returning();
 
     if (updated.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Failed to update review form',
-        code: 'UPDATE_FAILED' 
+        code: 'UPDATE_FAILED'
       }, { status: 500 });
     }
 
@@ -313,8 +313,8 @@ export async function PUT(
 
   } catch (error) {
     console.error('PUT review form error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + (error as Error).message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + (error as Error).message
     }, { status: 500 });
   }
 }
@@ -324,29 +324,29 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Authentication required',
-        code: 'AUTHENTICATION_REQUIRED' 
+        code: 'AUTHENTICATION_REQUIRED'
       }, { status: 401 });
     }
 
     // Admin only check
     const userRole = currentUser.role?.toLowerCase();
     if (userRole !== 'admin') {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Only administrators can delete review forms',
-        code: 'ADMIN_ONLY' 
+        code: 'ADMIN_ONLY'
       }, { status: 403 });
     }
 
     const { id } = await params;
     const formId = id;
     if (!formId || isNaN(parseInt(formId))) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Valid form ID is required',
-        code: 'INVALID_FORM_ID' 
+        code: 'INVALID_FORM_ID'
       }, { status: 400 });
     }
 
@@ -357,9 +357,9 @@ export async function DELETE(
       .limit(1);
 
     if (existingForm.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Review form not found',
-        code: 'FORM_NOT_FOUND' 
+        code: 'FORM_NOT_FOUND'
       }, { status: 404 });
     }
 
@@ -369,9 +369,9 @@ export async function DELETE(
       .returning();
 
     if (deleted.length === 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: 'Failed to delete review form',
-        code: 'DELETE_FAILED' 
+        code: 'DELETE_FAILED'
       }, { status: 500 });
     }
 
@@ -382,8 +382,8 @@ export async function DELETE(
 
   } catch (error) {
     console.error('DELETE review form error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + (error as Error).message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + (error as Error).message
     }, { status: 500 });
   }
 }

@@ -8,16 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
   Clock,
   CheckCircle2,
-  AlertCircle,
   Star,
   FileText,
   Eye,
@@ -28,8 +20,7 @@ import {
   User,
 } from "lucide-react"
 import { toast } from "sonner"
-import { ReviewFormComponent } from "./review-form-component"
-import { useSession } from "@/lib/auth-client"
+import { useAuth } from "@/hooks/use-auth"
 
 interface ReviewForm {
   id: number
@@ -70,20 +61,18 @@ interface Notification {
 
 export function EmployeeReviewDashboard() {
   const router = useRouter()
-  const { data: session } = useSession()
+  const { user } = useAuth()
   const [myReviews, setMyReviews] = useState<ReviewForm[]>([])
   const [reviewsAboutMe, setReviewsAboutMe] = useState<ReviewForm[]>([])
   const [stats, setStats] = useState<ReviewStats | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [selectedReview, setSelectedReview] = useState<ReviewForm | null>(null)
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
 
   useEffect(() => {
-    if (session?.user) {
+    if (user) {
       fetchData()
     }
-  }, [session])
+  }, [user])
 
   const fetchData = async () => {
     setIsLoading(true)
@@ -103,12 +92,7 @@ export function EmployeeReviewDashboard() {
 
   const fetchMyReviews = async () => {
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch(`/api/reviews/forms?reviewerId=${session?.user?.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(`/api/reviews/forms?reviewerId=${user?.id}`)
       if (!response.ok) throw new Error("Failed to fetch my reviews")
       const data = await response.json()
       setMyReviews(data)
@@ -119,12 +103,7 @@ export function EmployeeReviewDashboard() {
 
   const fetchReviewsAboutMe = async () => {
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch(`/api/reviews/forms?employeeId=${session?.user?.id}&status=submitted`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(`/api/reviews/forms?employeeId=${user?.id}&status=submitted`)
       if (!response.ok) throw new Error("Failed to fetch reviews about me")
       const data = await response.json()
       setReviewsAboutMe(data)
@@ -135,12 +114,7 @@ export function EmployeeReviewDashboard() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch("/api/reviews/stats", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch("/api/reviews/stats")
       if (!response.ok) throw new Error("Failed to fetch stats")
       const data = await response.json()
       setStats(data.stats)
@@ -151,12 +125,7 @@ export function EmployeeReviewDashboard() {
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch("/api/reviews/notifications?isRead=false&limit=10", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch("/api/reviews/notifications?isRead=false&limit=10")
       if (!response.ok) throw new Error("Failed to fetch notifications")
       const data = await response.json()
       setNotifications(data)
@@ -167,12 +136,8 @@ export function EmployeeReviewDashboard() {
 
   const handleMarkNotificationRead = async (notificationId: number) => {
     try {
-      const token = localStorage.getItem("bearer_token")
       await fetch(`/api/reviews/notifications/${notificationId}/read`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
       })
       fetchNotifications()
     } catch (error) {

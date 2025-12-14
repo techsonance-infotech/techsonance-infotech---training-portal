@@ -99,12 +99,7 @@ export function HRReviewDashboard() {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch("/api/reviews/stats", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch("/api/reviews/stats")
       if (!response.ok) throw new Error("Failed to fetch stats")
       const data = await response.json()
       setStats(data.stats)

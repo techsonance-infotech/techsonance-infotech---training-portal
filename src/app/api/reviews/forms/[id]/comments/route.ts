@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewComments, reviewForms, user } from '@/db/schema';
+import { reviewComments, reviewForms, users } from '@/db/schema';
 import { eq, asc } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -24,7 +24,8 @@ export async function GET(
     }
 
     // Validate form ID
-    const formId = parseInt(params.id);
+    const { id } = await params;
+    const formId = parseInt(id);
     if (isNaN(formId)) {
       return NextResponse.json(
         { error: 'Valid form ID is required', code: 'INVALID_ID' },
@@ -55,11 +56,11 @@ export async function GET(
         commenterRole: reviewComments.commenterRole,
         comment: reviewComments.comment,
         createdAt: reviewComments.createdAt,
-        commenterName: user.name,
-        commenterEmail: user.email,
+        commenterName: users.name,
+        commenterEmail: users.email,
       })
       .from(reviewComments)
-      .leftJoin(user, eq(reviewComments.commenterId, user.id))
+      .leftJoin(users, eq(reviewComments.commenterId, users.id))
       .where(eq(reviewComments.formId, formId))
       .orderBy(asc(reviewComments.createdAt));
 
@@ -75,11 +76,11 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -93,7 +94,8 @@ export async function POST(
     }
 
     // Validate form ID
-    const formId = parseInt(params.id);
+    const { id } = await params;
+    const formId = parseInt(id);
     if (isNaN(formId)) {
       return NextResponse.json(
         { error: 'Valid form ID is required', code: 'INVALID_ID' },
@@ -142,12 +144,12 @@ export async function POST(
     // Get commenter details
     const commenterDetails = await db
       .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
+        id: users.id,
+        name: users.name,
+        email: users.email,
       })
-      .from(user)
-      .where(eq(user.id, currentUser.id))
+      .from(users)
+      .where(eq(users.id, currentUser.id))
       .limit(1);
 
     // Combine comment with commenter details

@@ -1,27 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { appraisals, user, reviewCycles } from '@/db/schema';
+import { appraisals, users, reviewCycles } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
         { status: 401 }
-      );
-    }
-
-    const userRole = currentUser.role?.toLowerCase();
-    if (userRole !== 'admin' && userRole !== 'hr') {
-      return NextResponse.json(
-        { error: 'Access forbidden. Admin or HR role required.', code: 'FORBIDDEN' },
-        { status: 403 }
       );
     }
 
@@ -36,62 +28,48 @@ export async function GET(
 
     const appraisalId = parseInt(id);
 
-    const result = await db
+    const appraisalsFound = await db
       .select({
-        id: appraisals.id,
-        employeeId: appraisals.employeeId,
-        cycleId: appraisals.cycleId,
-        reviewYear: appraisals.reviewYear,
-        pastCtc: appraisals.pastCtc,
-        currentCtc: appraisals.currentCtc,
-        hikePercentage: appraisals.hikePercentage,
-        notes: appraisals.notes,
-        updatedBy: appraisals.updatedBy,
-        createdAt: appraisals.createdAt,
-        updatedAt: appraisals.updatedAt,
-        employee: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-        cycle: {
-          id: reviewCycles.id,
-          name: reviewCycles.name,
-          status: reviewCycles.status,
-          startDate: reviewCycles.startDate,
-          endDate: reviewCycles.endDate,
-        },
+        appraisals: appraisals,
+        users: users,
+        review_cycles: reviewCycles,
       })
       .from(appraisals)
-      .leftJoin(user, eq(appraisals.employeeId, user.id))
+      .leftJoin(users, eq(appraisals.employeeId, users.id))
       .leftJoin(reviewCycles, eq(appraisals.cycleId, reviewCycles.id))
-      .where(eq(appraisals.id, appraisalId))
-      .limit(1);
+      .where(eq(appraisals.id, appraisalId));
 
-    if (result.length === 0) {
+    if (appraisalsFound.length === 0) {
       return NextResponse.json(
-        { error: 'Appraisal not found', code: 'NOT_FOUND' },
+        { error: 'Appraisal not found' },
         { status: 404 }
       );
     }
 
-    const appraisal = result[0];
+    // Authorization check
+    if (currentUser.role !== 'admin' && currentUser.role !== 'hr') {
+      const appraisal = appraisalsFound[0].appraisals;
+      if (appraisal.employeeId !== currentUser.id) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    }
 
-    const updatedByUser = await db
-      .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      })
-      .from(user)
-      .where(eq(user.id, appraisal.updatedBy))
-      .limit(1);
+    const { appraisals: appraisal, users: employee, review_cycles: cycle } = appraisalsFound[0];
 
     return NextResponse.json({
       ...appraisal,
-      updatedByUser: updatedByUser[0] || null,
+      employee: employee ? {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        image: employee.image,
+        role: employee.role,
+      } : null,
+      cycle: cycle ? {
+        id: cycle.id,
+        name: cycle.name,
+        year: cycle.year,
+      } : null,
     });
   } catch (error) {
     console.error('GET appraisal error:', error);
@@ -107,7 +85,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
@@ -270,51 +248,51 @@ export async function PUT(
 
     const enrichedResult = await db
       .select({
-        id: appraisals.id,
-        employeeId: appraisals.employeeId,
-        cycleId: appraisals.cycleId,
-        reviewYear: appraisals.reviewYear,
-        pastCtc: appraisals.pastCtc,
-        currentCtc: appraisals.currentCtc,
-        hikePercentage: appraisals.hikePercentage,
-        notes: appraisals.notes,
-        updatedBy: appraisals.updatedBy,
-        createdAt: appraisals.createdAt,
-        updatedAt: appraisals.updatedAt,
-        employee: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-        cycle: {
-          id: reviewCycles.id,
-          name: reviewCycles.name,
-          status: reviewCycles.status,
-          startDate: reviewCycles.startDate,
-          endDate: reviewCycles.endDate,
-        },
+        appraisals: appraisals,
+        users: users,
+        review_cycles: reviewCycles,
       })
       .from(appraisals)
-      .leftJoin(user, eq(appraisals.employeeId, user.id))
+      .leftJoin(users, eq(appraisals.employeeId, users.id))
       .leftJoin(reviewCycles, eq(appraisals.cycleId, reviewCycles.id))
-      .where(eq(appraisals.id, appraisalId))
-      .limit(1);
+      .where(eq(appraisals.id, appraisalId));
 
-    const updatedByUser = await db
-      .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      })
-      .from(user)
-      .where(eq(user.id, updated[0].updatedBy))
-      .limit(1);
+    if (enrichedResult.length === 0) {
+      return NextResponse.json(
+        { error: 'Appraisal not found after update' },
+        { status: 404 }
+      );
+    }
+
+    const { appraisals: appraisal, users: employee, review_cycles: cycle } = enrichedResult[0];
+
+    const updatedByUser = await db.query.users.findFirst({
+      where: eq(users.id, appraisal.updatedBy || '')
+    });
+
+    // safe user
+    const safeUpdatedBy = updatedByUser ? {
+      id: updatedByUser.id,
+      name: updatedByUser.name,
+      email: updatedByUser.email,
+      role: updatedByUser.role
+    } : null;
 
     return NextResponse.json({
-      ...enrichedResult[0],
-      updatedByUser: updatedByUser[0] || null,
+      ...appraisal,
+      employee: employee ? {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        image: employee.image,
+        role: employee.role,
+      } : null,
+      cycle: cycle ? {
+        id: cycle.id,
+        name: cycle.name,
+        year: cycle.year,
+      } : null,
+      updatedByUser: safeUpdatedBy,
     });
   } catch (error) {
     console.error('PUT appraisal error:', error);
@@ -330,7 +308,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },

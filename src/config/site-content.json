@@ -1,0 +1,12 @@
+{
+    "loginPage": {
+        "hero": {
+            "title": "TechSonance InfoTech LLP",
+            "subtitle": "Learning Platform"
+        },
+        "form": {
+            "welcomeTitle": "Welcome to TechSonance InfoTech Learning Platform..!",
+            "description": "Learning is the only thing the mind never exhausts, never fears, and never regrets. \n– Leonardo da Vinci"
+        }
+    }
+}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { employeeOnboarding, user } from '@/db/schema';
+import { employeeOnboarding, users } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 
 export async function GET(
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     const result = submission[0];
-    
+
     // Get reviewer details if reviewedBy exists
     let reviewerDetails = null;
     if (result.reviewedBy) {
@@ -167,9 +167,9 @@ export async function DELETE(
     const status = existing[0].status;
     if (status !== 'pending' && status !== 'rejected') {
       return NextResponse.json(
-        { 
-          error: 'Cannot delete submission with status: ' + status + '. Only pending or rejected submissions can be deleted.', 
-          code: 'DELETE_NOT_ALLOWED' 
+        {
+          error: 'Cannot delete submission with status: ' + status + '. Only pending or rejected submissions can be deleted.',
+          code: 'DELETE_NOT_ALLOWED'
         },
         { status: 400 }
       );

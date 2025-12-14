@@ -11,23 +11,22 @@ export async function GET(
     const { userId } = context.params;
 
     // Validate userId is a valid integer
-    if (!userId || isNaN(parseInt(userId))) {
+    // Validate userId is present
+    if (!userId) {
       return NextResponse.json(
         {
-          error: 'Valid user ID is required',
-          code: 'INVALID_USER_ID',
+          error: 'User ID is required',
+          code: 'MISSING_USER_ID',
         },
         { status: 400 }
       );
     }
 
-    const parsedUserId = parseInt(userId);
-
     // Query portfolio by userId
     const portfolioResult = await db
       .select()
       .from(portfolios)
-      .where(eq(portfolios.userId, parsedUserId))
+      .where(eq(portfolios.userId, userId))
       .limit(1);
 
     // If no portfolio exists, return null portfolio with empty items array

@@ -7,17 +7,18 @@ const VALID_ACTIVITY_TYPES = ['overview', 'discussion', 'practical', 'review'] a
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const courseId = context.params.id;
+    const { id } = await context.params;
+    const courseId = id;
 
     // Validate course ID
     if (!courseId || isNaN(parseInt(courseId))) {
       return NextResponse.json(
-        { 
+        {
           error: 'Valid course ID is required',
-          code: 'INVALID_COURSE_ID' 
+          code: 'INVALID_COURSE_ID'
         },
         { status: 400 }
       );
@@ -44,17 +45,18 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const courseId = context.params.id;
+    const { id } = await context.params;
+    const courseId = id;
 
     // Validate course ID
     if (!courseId || isNaN(parseInt(courseId))) {
       return NextResponse.json(
-        { 
+        {
           error: 'Valid course ID is required',
-          code: 'INVALID_COURSE_ID' 
+          code: 'INVALID_COURSE_ID'
         },
         { status: 400 }
       );
@@ -69,9 +71,9 @@ export async function POST(
     // Validate required fields
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'Title is required and must be a non-empty string',
-          code: 'MISSING_TITLE' 
+          code: 'MISSING_TITLE'
         },
         { status: 400 }
       );
@@ -79,9 +81,9 @@ export async function POST(
 
     if (!type || typeof type !== 'string') {
       return NextResponse.json(
-        { 
+        {
           error: 'Type is required',
-          code: 'MISSING_TYPE' 
+          code: 'MISSING_TYPE'
         },
         { status: 400 }
       );
@@ -90,9 +92,9 @@ export async function POST(
     // Validate type is one of the allowed values
     if (!VALID_ACTIVITY_TYPES.includes(type as typeof VALID_ACTIVITY_TYPES[number])) {
       return NextResponse.json(
-        { 
+        {
           error: `Type must be one of: ${VALID_ACTIVITY_TYPES.join(', ')}`,
-          code: 'INVALID_TYPE' 
+          code: 'INVALID_TYPE'
         },
         { status: 400 }
       );
@@ -100,9 +102,9 @@ export async function POST(
 
     if (!description || typeof description !== 'string' || description.trim().length === 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'Description is required and must be a non-empty string',
-          code: 'MISSING_DESCRIPTION' 
+          code: 'MISSING_DESCRIPTION'
         },
         { status: 400 }
       );
@@ -110,9 +112,9 @@ export async function POST(
 
     if (!scheduledDate || typeof scheduledDate !== 'string' || scheduledDate.trim().length === 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'Scheduled date is required and must be a valid ISO timestamp',
-          code: 'MISSING_SCHEDULED_DATE' 
+          code: 'MISSING_SCHEDULED_DATE'
         },
         { status: 400 }
       );

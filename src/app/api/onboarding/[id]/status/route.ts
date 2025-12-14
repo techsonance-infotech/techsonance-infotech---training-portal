@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { employeeOnboarding, user } from '@/db/schema';
+import { employeeOnboarding, users, account } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
+import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 const VALID_STATUSES = ['pending', 'in_review', 'approved', 'rejected'] as const;
 type ValidStatus = typeof VALID_STATUSES[number];
@@ -45,9 +47,9 @@ export async function PATCH(
     // Validate status is one of valid values
     if (!VALID_STATUSES.includes(status)) {
       return NextResponse.json(
-        { 
+        {
           error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
-          code: 'INVALID_STATUS' 
+          code: 'INVALID_STATUS'
         },
         { status: 400 }
       );
@@ -73,9 +75,9 @@ export async function PATCH(
     // Check if submission is approved (immutable)
     if (currentStatus === 'approved') {
       return NextResponse.json(
-        { 
+        {
           error: 'Cannot modify approved submission. Approved submissions are immutable.',
-          code: 'APPROVED_IMMUTABLE' 
+          code: 'APPROVED_IMMUTABLE'
         },
         { status: 400 }
       );
@@ -85,9 +87,9 @@ export async function PATCH(
     const allowedTransitions = VALID_TRANSITIONS[currentStatus];
     if (!allowedTransitions.includes(status)) {
       return NextResponse.json(
-        { 
+        {
           error: `Invalid status transition from '${currentStatus}' to '${status}'. Allowed transitions: ${allowedTransitions.join(', ') || 'none'}`,
-          code: 'INVALID_TRANSITION' 
+          code: 'INVALID_TRANSITION'
         },
         { status: 400 }
       );
@@ -96,9 +98,9 @@ export async function PATCH(
     // Validate reviewerId is required when approving or rejecting
     if ((status === 'approved' || status === 'rejected') && !reviewerId) {
       return NextResponse.json(
-        { 
+        {
           error: 'Reviewer ID is required when approving or rejecting',
-          code: 'REVIEWER_REQUIRED' 
+          code: 'REVIEWER_REQUIRED'
         },
         { status: 400 }
       );
@@ -108,73 +110,96 @@ export async function PATCH(
     if (reviewerId) {
       const reviewer = await db
         .select()
-        .from(user)
-        .where(eq(user.id, reviewerId))
+        .from(users)
+        .where(eq(users.id, reviewerId))
         .limit(1);
 
       if (reviewer.length === 0) {
         return NextResponse.json(
           { error: 'Reviewer user not found', code: 'REVIEWER_NOT_FOUND' },
-          { status: 404 }
+          { status: 400 }
         );
       }
     }
 
-    // Prepare update data
-    const updateData: any = {
-      status,
-      updatedAt: new Date().toISOString(),
-    };
+    const now = new Date();
 
-    // Set reviewedBy and reviewedAt when approving or rejecting
-    if (status === 'approved' || status === 'rejected') {
-      updateData.reviewedBy = reviewerId;
-      updateData.reviewedAt = new Date().toISOString();
-    }
-
-    // Add comment if provided
-    if (comment) {
-      updateData.reviewerComment = comment;
-    }
-
-    // Update submission
-    const updatedSubmission = await db
-      .update(employeeOnboarding)
-      .set(updateData)
-      .where(eq(employeeOnboarding.id, submissionId))
-      .returning();
-
-    if (updatedSubmission.length === 0) {
-      return NextResponse.json(
-        { error: 'Failed to update submission', code: 'UPDATE_FAILED' },
-        { status: 500 }
-      );
-    }
-
-    // Fetch reviewer details if reviewedBy exists
-    let reviewerDetails = null;
-    if (updatedSubmission[0].reviewedBy) {
-      const reviewerData = await db
-        .select({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
+    // Start a transaction
+    const transactionResult = await db.transaction(async (tx) => {
+      // Update onboarding status
+      const updatedSubmission = await tx.update(employeeOnboarding)
+        .set({
+          status: status as any,
+          reviewedBy: reviewerId || null,
+          reviewedAt: (status === 'approved' || status === 'rejected') ? now.toISOString() : null,
+          updatedAt: now.toISOString(),
         })
-        .from(user)
-        .where(eq(user.id, updatedSubmission[0].reviewedBy))
-        .limit(1);
+        .where(eq(employeeOnboarding.id, parseInt(id)))
+        .returning();
 
-      if (reviewerData.length > 0) {
-        reviewerDetails = reviewerData[0];
+      if (!updatedSubmission || updatedSubmission.length === 0) {
+        throw new Error("Failed to update submission");
       }
-    }
 
-    // Return updated submission with reviewer details
-    return NextResponse.json({
-      ...updatedSubmission[0],
-      reviewer: reviewerDetails,
-    }, { status: 200 });
+      const submissionData = updatedSubmission[0];
+      let userCreated = false;
+      let temporaryPassword = null;
+
+      // If approved, create a user account
+      if (status === 'approved') {
+        // Check if user already exists
+        const existingUser = await tx.select().from(users).where(eq(users.email, submissionData.personalEmail)).limit(1);
+
+        if (existingUser.length === 0) {
+          const defaultPassword = "ChangeMe123!";
+          const hashedPassword = await bcrypt.hash(defaultPassword, 12);
+          const userId = randomUUID();
+
+          // Create user
+          await tx.insert(users).values({
+            id: userId,
+            name: submissionData.fullName,
+            email: submissionData.personalEmail,
+            passwordHash: hashedPassword,
+            role: 'employee',
+            createdAt: now,
+            updatedAt: now,
+          });
+
+          userCreated = true;
+          temporaryPassword = defaultPassword;
+        }
+      }
+
+      // Fetch reviewer details if reviewedBy exists
+      let reviewerDetails = null;
+      if (submissionData.reviewedBy) {
+        const reviewerData = await db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+          })
+          .from(users)
+          .where(eq(users.id, submissionData.reviewedBy))
+          .limit(1);
+
+        if (reviewerData.length > 0) {
+          reviewerDetails = reviewerData[0];
+        }
+      }
+
+      // Return updated submission with reviewer details
+      return NextResponse.json({
+        ...submissionData,
+        reviewer: reviewerDetails,
+        temporaryPassword,
+        userCreated,
+      }, { status: 200 });
+    });
+
+    return transactionResult;
 
   } catch (error) {
     console.error('PATCH /api/onboarding/[id]/status error:', error);

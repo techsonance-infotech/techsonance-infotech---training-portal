@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewForms, reviewerAssignments, reviewCycles, user } from '@/db/schema';
+import { reviewForms, reviewerAssignments, reviewCycles, users } from '@/db/schema';
 import { eq, and, or, count, avg, sql, inArray } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
         );
       }
       const averageRatingResult = await averageRatingQuery;
-      stats.averageRating = averageRatingResult[0]?.avg 
-        ? parseFloat(averageRatingResult[0].avg.toFixed(2)) 
+      stats.averageRating = averageRatingResult[0]?.avg
+        ? parseFloat(averageRatingResult[0].avg.toFixed(2))
         : null;
 
       // Forms by type
@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
       })
         .from(reviewForms)
         .groupBy(reviewForms.reviewerType);
-      
+
       if (cycleId) {
         formsByTypeQuery = db.select({
           reviewerType: reviewForms.reviewerType,
@@ -157,7 +157,7 @@ export async function GET(request: NextRequest) {
           .where(eq(reviewForms.cycleId, cycleId))
           .groupBy(reviewForms.reviewerType);
       }
-      
+
       const formsByTypeResult = await formsByTypeQuery;
       stats.formsByType = formsByTypeResult.reduce((acc: any, row: any) => {
         acc[row.reviewerType] = row.count;
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
       })
         .from(reviewForms)
         .groupBy(reviewForms.status);
-      
+
       if (cycleId) {
         formsByStatusQuery = db.select({
           status: reviewForms.status,
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
           .where(eq(reviewForms.cycleId, cycleId))
           .groupBy(reviewForms.status);
       }
-      
+
       const formsByStatusResult = await formsByStatusQuery;
       stats.formsByStatus = formsByStatusResult.reduce((acc: any, row: any) => {
         acc[row.status] = row.count;
@@ -293,8 +293,8 @@ export async function GET(request: NextRequest) {
           );
       }
       const myAverageRatingResult = await myAverageRatingQuery;
-      stats.myAverageRating = myAverageRatingResult[0]?.avg 
-        ? parseFloat(myAverageRatingResult[0].avg.toFixed(2)) 
+      stats.myAverageRating = myAverageRatingResult[0]?.avg
+        ? parseFloat(myAverageRatingResult[0].avg.toFixed(2))
         : null;
 
       // Upcoming deadlines (assignments where I am the reviewer and status is pending)
@@ -315,7 +315,7 @@ export async function GET(request: NextRequest) {
             eq(reviewerAssignments.status, 'pending')
           )
         );
-      
+
       if (cycleId) {
         upcomingDeadlinesQuery = db.select({
           id: reviewerAssignments.id,
@@ -356,8 +356,8 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('GET error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + error.message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + error.message
     }, { status: 500 });
   }
 }

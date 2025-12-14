@@ -22,7 +22,7 @@ import { toast } from "sonner"
 export default function NewOnboardingPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   // Section 1: Personal Information
   const [fullName, setFullName] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
@@ -34,7 +34,7 @@ export default function NewOnboardingPage() {
   const [emergencyContactName, setEmergencyContactName] = useState("")
   const [emergencyContactRelationship, setEmergencyContactRelationship] = useState("")
   const [emergencyContactPhone, setEmergencyContactPhone] = useState("")
-  
+
   // Section 2: Identity & Verification
   const [aadhaarNumber, setAadhaarNumber] = useState("")
   const [panNumber, setPanNumber] = useState("")
@@ -42,7 +42,7 @@ export default function NewOnboardingPage() {
   const [panUploadUrl, setPanUploadUrl] = useState("")
   const [passportUploadUrl, setPassportUploadUrl] = useState("")
   const [photoUploadUrl, setPhotoUploadUrl] = useState("")
-  
+
   // Section 3: Employment Details
   const [jobTitle, setJobTitle] = useState("")
   const [department, setDepartment] = useState("")
@@ -50,14 +50,14 @@ export default function NewOnboardingPage() {
   const [dateOfJoining, setDateOfJoining] = useState("")
   const [employmentType, setEmploymentType] = useState("")
   const [workLocation, setWorkLocation] = useState("")
-  
+
   // Section 4: Educational & Skill Details
   const [highestQualification, setHighestQualification] = useState("")
   const [degreeCertificateUrl, setDegreeCertificateUrl] = useState("")
   const [technicalSkills, setTechnicalSkills] = useState<string[]>([])
   const [certificationsUrls, setCertificationsUrls] = useState<string[]>([])
   const [certificationInput, setCertificationInput] = useState("")
-  
+
   // Section 5: Previous Employment
   const [previousCompany, setPreviousCompany] = useState("")
   const [previousJobTitle, setPreviousJobTitle] = useState("")
@@ -65,26 +65,26 @@ export default function NewOnboardingPage() {
   const [experienceLetterUrl, setExperienceLetterUrl] = useState("")
   const [uanNumber, setUanNumber] = useState("")
   const [lastSalarySlipUrl, setLastSalarySlipUrl] = useState("")
-  
+
   // Section 6: Bank Details
   const [bankAccountNumber, setBankAccountNumber] = useState("")
   const [ifscCode, setIfscCode] = useState("")
   const [bankNameBranch, setBankNameBranch] = useState("")
   const [cancelledChequeUrl, setCancelledChequeUrl] = useState("")
-  
+
   // Section 7: Tax Information
   const [taxRegime, setTaxRegime] = useState("")
   const [investmentProofsUrl, setInvestmentProofsUrl] = useState("")
-  
+
   // Section 8: IT & System Setup
   const [laptopRequired, setLaptopRequired] = useState("")
   const [softwareAccess, setSoftwareAccess] = useState<string[]>([])
   const [tshirtSize, setTshirtSize] = useState("")
-  
+
   // Section 9: Policy Agreements
   const [policyAgreements, setPolicyAgreements] = useState<string[]>([])
   const [signature, setSignature] = useState("")
-  
+
   // Section 10: Additional Information
   const [bloodGroup, setBloodGroup] = useState("")
   const [linkedinProfile, setLinkedinProfile] = useState("")
@@ -146,20 +146,20 @@ export default function NewOnboardingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Validation
     if (!fullName || !dateOfBirth || !gender || !personalEmail || !personalPhone || !currentAddress ||
-        !emergencyContactName || !emergencyContactRelationship || !emergencyContactPhone ||
-        !aadhaarNumber || !panNumber || !photoUploadUrl ||
-        !jobTitle || !dateOfJoining || !employmentType || !workLocation ||
-        !bankAccountNumber || !ifscCode || !bankNameBranch || !cancelledChequeUrl ||
-        !taxRegime || !laptopRequired || policyAgreements.length === 0 || !signature) {
+      !emergencyContactName || !emergencyContactRelationship || !emergencyContactPhone ||
+      !aadhaarNumber || !photoUploadUrl ||
+      !jobTitle || !dateOfJoining || !employmentType || !workLocation ||
+      !bankAccountNumber || !ifscCode || !bankNameBranch || !cancelledChequeUrl ||
+      !taxRegime || !laptopRequired || policyAgreements.length === 0 || !signature) {
       toast.error("Please fill in all required fields")
       return
     }
 
     setIsSubmitting(true)
-    
+
     try {
       const token = localStorage.getItem("bearer_token")
       const payload = {
@@ -174,7 +174,7 @@ export default function NewOnboardingPage() {
         emergencyContactRelationship,
         emergencyContactPhone,
         aadhaarNumber,
-        panNumber,
+        panNumber: panNumber || null,
         aadhaarUploadUrl: aadhaarUploadUrl || null,
         panUploadUrl: panUploadUrl || null,
         passportUploadUrl: passportUploadUrl || null,
@@ -204,7 +204,7 @@ export default function NewOnboardingPage() {
         laptopRequired,
         softwareAccess: softwareAccess.length > 0 ? JSON.stringify(softwareAccess) : null,
         tshirtSize: tshirtSize || null,
-        policyAgreements: JSON.stringify(policyAgreements),
+        policyAgreements: JSON.stringify(policyAgreements), // Send as JSON string to match backend expectation of text field trying to parse JSON
         signature,
         bloodGroup: bloodGroup || null,
         linkedinProfile: linkedinProfile || null,
@@ -343,8 +343,8 @@ export default function NewOnboardingPage() {
               <Input id="aadhaarNumber" value={aadhaarNumber} onChange={(e) => setAadhaarNumber(e.target.value)} required placeholder="XXXX-XXXX-XXXX" />
             </div>
             <div>
-              <Label htmlFor="panNumber">PAN Number <span className="text-destructive">*</span></Label>
-              <Input id="panNumber" value={panNumber} onChange={(e) => setPanNumber(e.target.value.toUpperCase())} required placeholder="ABCDE1234F" />
+              <Label htmlFor="panNumber">PAN Number</Label>
+              <Input id="panNumber" value={panNumber} onChange={(e) => setPanNumber(e.target.value.toUpperCase())} placeholder="ABCDE1234F" />
             </div>
             <div>
               <Label htmlFor="aadhaarUploadUrl">Aadhaar Card Upload URL</Label>
@@ -441,7 +441,7 @@ export default function NewOnboardingPage() {
                 <Input id="degreeCertificateUrl" type="url" value={degreeCertificateUrl} onChange={(e) => setDegreeCertificateUrl(e.target.value)} placeholder="https://..." />
               </div>
             </div>
-            
+
             <div>
               <Label>Technical Skills</Label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">

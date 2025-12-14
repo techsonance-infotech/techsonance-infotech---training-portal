@@ -35,30 +35,32 @@ export default function EmployeeCoursesPage() {
   const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
-    fetchCourses()
-    fetchAssignments()
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([fetchCourses(), fetchAssignments()]);
+      } catch (error) {
+        console.error("Error loading data", error);
+        toast.error("Failed to load dashboard data");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
   }, [])
 
   const fetchCourses = async () => {
-    try {
-      const response = await fetch("/api/courses?limit=100")
-      const data = await response.json()
-      setCourses(data)
-    } catch (error) {
-      toast.error("Failed to load courses")
-    } finally {
-      setIsLoading(false)
-    }
+    const response = await fetch("/api/courses?limit=100")
+    if (!response.ok) throw new Error("Failed to fetch courses");
+    const data = await response.json()
+    setCourses(data)
   }
 
   const fetchAssignments = async () => {
-    try {
-      const response = await fetch("/api/assignments")
-      const data = await response.json()
-      setAssignments(data)
-    } catch (error) {
-      console.error("Failed to load assignments")
-    }
+    const response = await fetch("/api/assignments")
+    if (!response.ok) throw new Error("Failed to fetch assignments");
+    const data = await response.json()
+    setAssignments(data)
   }
 
   const handleCourseClick = (courseId: number) => {
@@ -202,7 +204,7 @@ export default function EmployeeCoursesPage() {
                         <span className="text-[#00C2FF] font-medium">{progress}%</span>
                       </div>
                       <div className="h-2 bg-[#0A1A2F]/10 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] transition-all duration-500"
                           style={{ width: `${progress}%` }}
                         />

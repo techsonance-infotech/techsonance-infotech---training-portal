@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { employeeOnboarding, user } from '@/db/schema';
+import { employeeOnboarding, users } from '@/db/schema';
 import { eq, like, or, and, gte, lte, desc } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       'emergencyContactRelationship',
       'emergencyContactPhone',
       'aadhaarNumber',
-      'panNumber',
+      'aadhaarNumber',
       'photoUploadUrl',
       'jobTitle',
       'dateOfJoining',
@@ -194,6 +194,7 @@ export async function POST(request: NextRequest) {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(body.personalEmail)) {
+      console.log("Validation failed: Invalid email", body.personalEmail);
       return NextResponse.json(
         {
           error: 'Invalid email format for personalEmail',
@@ -205,6 +206,7 @@ export async function POST(request: NextRequest) {
 
     // Validate laptopRequired
     if (!['yes', 'no'].includes(body.laptopRequired)) {
+      console.log("Validation failed: laptopRequired", body.laptopRequired);
       return NextResponse.json(
         {
           error: 'laptopRequired must be either "yes" or "no"',
@@ -212,6 +214,18 @@ export async function POST(request: NextRequest) {
         },
         { status: 400 }
       );
+    }
+
+    // Log for debugging
+    console.log("Onboarding POST body:", JSON.stringify(body, null, 2));
+
+    // Allow empty strings for optional fields by setting them to null if empty
+    const optionalFields = ['department', 'reportingManager', 'degreeCertificateUrl', 'previousCompany', 'previousJobTitle', 'totalExperience', 'experienceLetterUrl', 'uanNumber', 'lastSalarySlipUrl', 'investmentProofsUrl', 'tshirtSize', 'bloodGroup', 'linkedinProfile', 'specialAccommodations', 'aboutYourself', 'careerGoals', 'hobbies', 'aadhaarUploadUrl', 'panUploadUrl', 'passportUploadUrl', 'permananetAddress'];
+
+    for (const field of optionalFields) {
+      if (body[field] === "") {
+        body[field] = null;
+      }
     }
 
     // Validate employment type
@@ -238,8 +252,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate policyAgreements is array
-    if (!Array.isArray(body.policyAgreements)) {
+    // Validate policyAgreements is array (or JSON string that parses to array)
+    let parsedPolicyAgreements = body.policyAgreements;
+    if (typeof body.policyAgreements === 'string') {
+      try {
+        parsedPolicyAgreements = JSON.parse(body.policyAgreements);
+      } catch (e) {
+        // failed to parse, keep as is to fail array check
+      }
+    }
+
+    if (!Array.isArray(parsedPolicyAgreements)) {
       return NextResponse.json(
         {
           error: 'policyAgreements must be an array',
@@ -266,21 +289,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for duplicate panNumber
-    const existingPan = await db
-      .select()
-      .from(employeeOnboarding)
-      .where(eq(employeeOnboarding.panNumber, body.panNumber))
-      .limit(1);
+    if (body.panNumber) {
+      // Check for duplicate panNumber
+      const existingPan = await db
+        .select()
+        .from(employeeOnboarding)
+        .where(eq(employeeOnboarding.panNumber, body.panNumber))
+        .limit(1);
 
-    if (existingPan.length > 0) {
-      return NextResponse.json(
-        {
-          error: 'Submission with this PAN number already exists',
-          code: 'DUPLICATE_PAN',
-        },
-        { status: 409 }
-      );
+      if (existingPan.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'Submission with this PAN number already exists',
+            code: 'DUPLICATE_PAN',
+          },
+          { status: 409 }
+        );
+      }
     }
 
     // Prepare insert data
@@ -291,7 +316,7 @@ export async function POST(request: NextRequest) {
       submittedAt: now,
       reviewedBy: null,
       reviewedAt: null,
-      
+
       // Section 1: Personal Information
       fullName: body.fullName.trim(),
       dateOfBirth: body.dateOfBirth,
@@ -303,15 +328,15 @@ export async function POST(request: NextRequest) {
       emergencyContactName: body.emergencyContactName.trim(),
       emergencyContactRelationship: body.emergencyContactRelationship.trim(),
       emergencyContactPhone: body.emergencyContactPhone.trim(),
-      
+
       // Section 2: Identity & Verification
       aadhaarNumber: body.aadhaarNumber.trim(),
-      panNumber: body.panNumber.trim(),
+      panNumber: body.panNumber?.trim() || 'N/A',
       aadhaarUploadUrl: body.aadhaarUploadUrl?.trim() || null,
       panUploadUrl: body.panUploadUrl?.trim() || null,
       passportUploadUrl: body.passportUploadUrl?.trim() || null,
       photoUploadUrl: body.photoUploadUrl.trim(),
-      
+
       // Section 3: Employment Details
       jobTitle: body.jobTitle.trim(),
       department: body.department?.trim() || null,
@@ -319,13 +344,13 @@ export async function POST(request: NextRequest) {
       dateOfJoining: body.dateOfJoining,
       employmentType: body.employmentType,
       workLocation: body.workLocation.trim(),
-      
+
       // Section 4: Educational & Skill Details
       highestQualification: body.highestQualification?.trim() || null,
       degreeCertificateUrl: body.degreeCertificateUrl?.trim() || null,
       technicalSkills: body.technicalSkills ? JSON.stringify(body.technicalSkills) : null,
       certificationsUrls: body.certificationsUrls ? JSON.stringify(body.certificationsUrls) : null,
-      
+
       // Section 5: Previous Employment
       previousCompany: body.previousCompany?.trim() || null,
       previousJobTitle: body.previousJobTitle?.trim() || null,
@@ -333,26 +358,26 @@ export async function POST(request: NextRequest) {
       experienceLetterUrl: body.experienceLetterUrl?.trim() || null,
       uanNumber: body.uanNumber?.trim() || null,
       lastSalarySlipUrl: body.lastSalarySlipUrl?.trim() || null,
-      
+
       // Section 6: Bank Details
       bankAccountNumber: body.bankAccountNumber.trim(),
       ifscCode: body.ifscCode.trim(),
       bankNameBranch: body.bankNameBranch.trim(),
       cancelledChequeUrl: body.cancelledChequeUrl.trim(),
-      
+
       // Section 7: Tax Information
       taxRegime: body.taxRegime.trim(),
       investmentProofsUrl: body.investmentProofsUrl?.trim() || null,
-      
+
       // Section 8: IT & System Setup
       laptopRequired: body.laptopRequired,
       softwareAccess: body.softwareAccess ? JSON.stringify(body.softwareAccess) : null,
       tshirtSize: body.tshirtSize?.trim() || null,
-      
+
       // Section 9: Policy Agreements
-      policyAgreements: JSON.stringify(body.policyAgreements),
+      policyAgreements: JSON.stringify(parsedPolicyAgreements),
       signature: body.signature.trim(),
-      
+
       // Section 10: Additional Information
       bloodGroup: body.bloodGroup?.trim() || null,
       linkedinProfile: body.linkedinProfile?.trim() || null,
@@ -361,7 +386,7 @@ export async function POST(request: NextRequest) {
       workPreferences: body.workPreferences ? JSON.stringify(body.workPreferences) : null,
       careerGoals: body.careerGoals?.trim() || null,
       hobbies: body.hobbies?.trim() || null,
-      
+
       // Timestamps
       createdAt: now,
       updatedAt: now,

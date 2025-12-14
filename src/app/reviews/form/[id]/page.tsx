@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { PageLoader } from "@/components/ui/loading-spinner"
 import { ReviewFormComponent } from "@/components/reviews/review-form-component"
-import { useSession } from "@/lib/auth-client"
+import { useAuth } from "@/hooks/use-auth"
 import { ArrowLeft, User, Mail, Briefcase, Calendar } from "lucide-react"
 import { toast } from "sonner"
 
@@ -34,29 +34,24 @@ interface ReviewForm {
 export default function ReviewFormPage() {
   const router = useRouter()
   const params = useParams()
-  const { data: session, isPending } = useSession()
+  const { user, loading } = useAuth()
   const [reviewData, setReviewData] = useState<ReviewForm | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    if (!isPending) {
-      if (!session?.user) {
+    if (!loading) {
+      if (!user) {
         router.push("/login")
       } else {
         fetchReviewData()
       }
     }
-  }, [session, isPending, params.id])
+  }, [user, loading, params.id])
 
   const fetchReviewData = async () => {
     setIsLoading(true)
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch(`/api/reviews/forms/${params.id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(`/api/reviews/forms/${params.id}`)
 
       if (!response.ok) {
         throw new Error("Failed to fetch review data")
@@ -73,19 +68,19 @@ export default function ReviewFormPage() {
     }
   }
 
-  if (isPending || isLoading) {
+  if (loading || isLoading) {
     return (
-      <DashboardLayout userRole={session?.user?.role || "employee"}>
+      <DashboardLayout userRole={user?.role as "admin" | "employee" | "intern" || "employee"}>
         <PageLoader text="Loading review form..." />
       </DashboardLayout>
     )
   }
 
-  if (!session?.user || !reviewData) {
+  if (!user || !reviewData) {
     return null
   }
 
-  const userRole = session.user.role?.toLowerCase() || "employee"
+  const userRole = user.role?.toLowerCase() || "employee"
   const isReadOnly = reviewData.status === "submitted"
 
   const getReviewerTypeColor = (type: string) => {
@@ -126,13 +121,13 @@ export default function ReviewFormPage() {
             <div className="flex items-start justify-between">
               <div className="space-y-2">
                 <CardTitle className="text-2xl bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">
-                  {reviewData.reviewerType === "self" 
-                    ? "Self Review Form" 
+                  {reviewData.reviewerType === "self"
+                    ? "Self Review Form"
                     : `Performance Review Form`}
                 </CardTitle>
                 <CardDescription className="text-base">
-                  {isReadOnly 
-                    ? "Viewing submitted review" 
+                  {isReadOnly
+                    ? "Viewing submitted review"
                     : "Complete the review form below. Your progress is auto-saved every 30 seconds."}
                 </CardDescription>
               </div>
@@ -181,7 +176,7 @@ export default function ReviewFormPage() {
                   <Calendar className="h-4 w-4 text-[#00C2FF]" />
                   <span className="font-medium">Start Date:</span>
                   <span>
-                    {reviewData.cycle?.startDate 
+                    {reviewData.cycle?.startDate
                       ? new Date(reviewData.cycle.startDate).toLocaleDateString()
                       : "N/A"}
                   </span>
@@ -190,7 +185,7 @@ export default function ReviewFormPage() {
                   <Calendar className="h-4 w-4 text-[#00C2FF]" />
                   <span className="font-medium">End Date:</span>
                   <span>
-                    {reviewData.cycle?.endDate 
+                    {reviewData.cycle?.endDate
                       ? new Date(reviewData.cycle.endDate).toLocaleDateString()
                       : "N/A"}
                   </span>

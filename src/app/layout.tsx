@@ -10,8 +10,8 @@ export const metadata: Metadata = {
   title: "TechSonance InfoTech",
   description: "Professional training platform for employees and interns - Where Innovation Finds Its Resonance",
   icons: {
-    icon: '/favicon.ico',
-    shortcut: '/favicon.ico',
+    icon: '/favicon.png',
+    shortcut: '/favicon.png',
     apple: '/logo.png',
   },
 };

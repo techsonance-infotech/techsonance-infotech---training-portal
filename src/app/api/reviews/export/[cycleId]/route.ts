@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewCycles, reviewForms, user } from '@/db/schema';
+import { reviewCycles, reviewForms, users } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { cycleId: string } }
+  { params }: { params: Promise<{ cycleId: string }> }
 ) {
   try {
     // Authentication check
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
@@ -27,7 +27,7 @@ export async function GET(
     }
 
     // Validate cycle ID
-    const cycleId = params.cycleId;
+    const { cycleId } = await params;
     if (!cycleId || isNaN(parseInt(cycleId))) {
       return NextResponse.json(
         { error: 'Valid cycle ID is required', code: 'INVALID_CYCLE_ID' },
@@ -87,18 +87,19 @@ export async function GET(
     ].filter(id => id !== null);
 
     // Fetch user details for all involved users
-    const users = await db
+    // Fetch user details for all involved users
+    const userDetails = await db
       .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
       })
-      .from(user)
-      .where(sql`${user.id} IN ${sql.raw(`(${allUserIds.map(id => `'${id}'`).join(',')})`)}`);
+      .from(users)
+      .where(sql`${users.id} IN ${sql.raw(`(${allUserIds.map(id => `'${id}'`).join(',')})`)}`);
 
     // Create user lookup map
-    const userMap = new Map(users.map(u => [u.id, u]));
+    const userMap = new Map(userDetails.map(u => [u.id, u]));
 
     // Calculate statistics
     const totalEmployees = uniqueEmployeeIds.length;

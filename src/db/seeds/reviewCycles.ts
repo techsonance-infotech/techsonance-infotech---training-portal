@@ -1,18 +1,18 @@
 import { db } from '@/db';
-import { reviewCycles, user } from '@/db/schema';
+import { reviewCycles, users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
 async function main() {
     // Get the first user from the user table to use as createdBy
-    const firstUser = await db.select().from(user).limit(1);
-    
+    const firstUser = await db.select().from(users).limit(1);
+
     if (!firstUser || firstUser.length === 0) {
         throw new Error('No users found in the database. Please seed users first.');
     }
-    
+
     const createdByUserId = firstUser[0].id;
     const currentTimestamp = new Date().toISOString();
-    
+
     const sampleReviewCycles = [
         {
             name: 'H1 2025 Review',
@@ -47,7 +47,7 @@ async function main() {
     ];
 
     await db.insert(reviewCycles).values(sampleReviewCycles);
-    
+
     console.log('✅ Review cycles seeder completed successfully');
 }
 

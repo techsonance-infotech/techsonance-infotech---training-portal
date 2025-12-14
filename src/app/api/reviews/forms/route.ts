@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewForms, reviewCycles, user, reviewerAssignments, reviewNotifications } from '@/db/schema';
+import { reviewForms, reviewCycles, users, reviewerAssignments, reviewNotifications } from '@/db/schema';
 import { eq, and, or, desc, sql } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -57,6 +57,12 @@ export async function GET(request: NextRequest) {
       if (cycleId) {
         conditions.push(eq(reviewForms.cycleId, parseInt(cycleId)));
       }
+      if (employeeId) {
+        conditions.push(eq(reviewForms.employeeId, employeeId));
+      }
+      if (reviewerId) {
+        conditions.push(eq(reviewForms.reviewerId, reviewerId));
+      }
       if (status) {
         conditions.push(eq(reviewForms.status, status));
       }
@@ -103,14 +109,14 @@ export async function GET(request: NextRequest) {
         results.map(async (form) => {
           const employeeData = await db
             .select()
-            .from(user)
-            .where(eq(user.id, form.employeeId))
+            .from(users)
+            .where(eq(users.id, form.employeeId))
             .limit(1);
 
           const reviewerData = await db
             .select()
-            .from(user)
-            .where(eq(user.id, form.reviewerId))
+            .from(users)
+            .where(eq(users.id, form.reviewerId))
             .limit(1);
 
           return {
@@ -140,14 +146,14 @@ export async function GET(request: NextRequest) {
         results.map(async (form) => {
           const employeeData = await db
             .select()
-            .from(user)
-            .where(eq(user.id, form.employeeId))
+            .from(users)
+            .where(eq(users.id, form.employeeId))
             .limit(1);
 
           const reviewerData = await db
             .select()
-            .from(user)
-            .where(eq(user.id, form.reviewerId))
+            .from(users)
+            .where(eq(users.id, form.reviewerId))
             .limit(1);
 
           return {
@@ -178,7 +184,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -268,8 +274,8 @@ export async function POST(request: NextRequest) {
     // Validate employeeId exists
     const employee = await db
       .select()
-      .from(user)
-      .where(eq(user.id, employeeId))
+      .from(users)
+      .where(eq(users.id, employeeId))
       .limit(1);
 
     if (employee.length === 0) {
@@ -282,8 +288,8 @@ export async function POST(request: NextRequest) {
     // Validate reviewerId exists
     const reviewer = await db
       .select()
-      .from(user)
-      .where(eq(user.id, finalReviewerId))
+      .from(users)
+      .where(eq(users.id, finalReviewerId))
       .limit(1);
 
     if (reviewer.length === 0) {
@@ -450,8 +456,8 @@ export async function POST(request: NextRequest) {
       if (reviewerType === 'manager') {
         const admins = await db
           .select()
-          .from(user)
-          .where(or(eq(user.role, 'admin'), eq(user.role, 'hr')));
+          .from(users)
+          .where(or(eq(users.role, 'admin'), eq(users.role, 'hr')));
 
         for (const admin of admins) {
           await db.insert(reviewNotifications).values({

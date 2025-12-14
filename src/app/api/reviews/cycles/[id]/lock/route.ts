@@ -2,20 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewCycles } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const authenticatedUser = await getCurrentUser(request);
+    const authenticatedUser = await getCurrentUser();
     if (!authenticatedUser) {
       return NextResponse.json(
-        { 
+        {
           error: 'Authentication required',
-          code: 'AUTHENTICATION_REQUIRED' 
+          code: 'AUTHENTICATION_REQUIRED'
         },
         { status: 401 }
       );
@@ -24,7 +24,7 @@ export async function POST(
     // Check if user is admin
     if (authenticatedUser.role !== 'admin') {
       return NextResponse.json(
-        { 
+        {
           error: 'Admin access required',
           code: 'INSUFFICIENT_PERMISSIONS'
         },
@@ -33,10 +33,10 @@ export async function POST(
     }
 
     // Validate ID parameter
-    const id = params.id;
+    const { id } = await params;
     if (!id || isNaN(parseInt(id))) {
       return NextResponse.json(
-        { 
+        {
           error: 'Valid cycle ID is required',
           code: 'INVALID_ID'
         },
@@ -54,7 +54,7 @@ export async function POST(
 
     if (existingCycle.length === 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'Review cycle not found',
           code: 'CYCLE_NOT_FOUND'
         },
@@ -67,7 +67,7 @@ export async function POST(
     // Validate cycle status - must be "active" or "draft"
     if (cycle.status !== 'active' && cycle.status !== 'draft') {
       return NextResponse.json(
-        { 
+        {
           error: `Cannot lock cycle with status "${cycle.status}". Cycle must be in "active" or "draft" status.`,
           code: 'INVALID_STATUS_TRANSITION',
           currentStatus: cycle.status
@@ -87,7 +87,7 @@ export async function POST(
 
     if (updatedCycle.length === 0) {
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to lock review cycle',
           code: 'UPDATE_FAILED'
         },
@@ -106,7 +106,7 @@ export async function POST(
   } catch (error) {
     console.error('POST /api/reviews/cycles/[id]/lock error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error: ' + (error instanceof Error ? error.message : 'Unknown error'),
         code: 'INTERNAL_SERVER_ERROR'
       },

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { appraisals, user, reviewCycles } from '@/db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { appraisals, users, reviewCycles } from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
@@ -31,33 +31,12 @@ export async function GET(request: NextRequest) {
 
     let query = db
       .select({
-        id: appraisals.id,
-        employeeId: appraisals.employeeId,
-        cycleId: appraisals.cycleId,
-        reviewYear: appraisals.reviewYear,
-        pastCtc: appraisals.pastCtc,
-        currentCtc: appraisals.currentCtc,
-        hikePercentage: appraisals.hikePercentage,
-        notes: appraisals.notes,
-        updatedBy: appraisals.updatedBy,
-        createdAt: appraisals.createdAt,
-        updatedAt: appraisals.updatedAt,
-        employee: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-        cycle: {
-          id: reviewCycles.id,
-          name: reviewCycles.name,
-          status: reviewCycles.status,
-          startDate: reviewCycles.startDate,
-          endDate: reviewCycles.endDate,
-        },
+        appraisals: appraisals,
+        users: users,
+        review_cycles: reviewCycles,
       })
       .from(appraisals)
-      .leftJoin(user, eq(appraisals.employeeId, user.id))
+      .leftJoin(users, eq(appraisals.employeeId, users.id))
       .leftJoin(reviewCycles, eq(appraisals.cycleId, reviewCycles.id));
 
     const conditions = [];
@@ -96,20 +75,36 @@ export async function GET(request: NextRequest) {
 
     const enrichedResults = await Promise.all(
       results.map(async (result) => {
-        const updatedByUser = await db
-          .select({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-          })
-          .from(user)
-          .where(eq(user.id, result.updatedBy))
-          .limit(1);
+        const updatedByUser = await db.query.users.findFirst({
+          where: eq(users.id, result.appraisals.updatedBy || '')
+        });
+
+        const safeUpdatedBy = updatedByUser ? {
+          id: updatedByUser.id,
+          name: updatedByUser.name,
+          email: updatedByUser.email,
+          role: updatedByUser.role
+        } : null;
+
+        const { appraisals: appraisal, users: employee, review_cycles: cycle } = result;
 
         return {
-          ...result,
-          updatedByUser: updatedByUser[0] || null,
+          ...appraisal,
+          employee: employee ? {
+            id: employee.id,
+            name: employee.name,
+            email: employee.email,
+            image: employee.image,
+            role: employee.role,
+          } : null,
+          cycle: cycle ? {
+            id: cycle.id,
+            name: cycle.name,
+            status: cycle.status,
+            startDate: cycle.startDate,
+            endDate: cycle.endDate,
+          } : null,
+          updatedByUser: safeUpdatedBy,
         };
       })
     );
@@ -126,7 +121,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
@@ -212,9 +207,9 @@ export async function POST(request: NextRequest) {
     }
 
     const employeeExists = await db
-      .select({ id: user.id })
-      .from(user)
-      .where(eq(user.id, employeeId))
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, employeeId))
       .limit(1);
 
     if (employeeExists.length === 0) {
@@ -278,50 +273,45 @@ export async function POST(request: NextRequest) {
 
     const enrichedAppraisal = await db
       .select({
-        id: appraisals.id,
-        employeeId: appraisals.employeeId,
-        cycleId: appraisals.cycleId,
-        reviewYear: appraisals.reviewYear,
-        pastCtc: appraisals.pastCtc,
-        currentCtc: appraisals.currentCtc,
-        hikePercentage: appraisals.hikePercentage,
-        notes: appraisals.notes,
-        updatedBy: appraisals.updatedBy,
-        createdAt: appraisals.createdAt,
-        updatedAt: appraisals.updatedAt,
-        employee: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-        cycle: {
-          id: reviewCycles.id,
-          name: reviewCycles.name,
-          status: reviewCycles.status,
-          startDate: reviewCycles.startDate,
-          endDate: reviewCycles.endDate,
-        },
+        appraisals: appraisals,
+        users: users,
+        review_cycles: reviewCycles,
       })
       .from(appraisals)
-      .leftJoin(user, eq(appraisals.employeeId, user.id))
+      .leftJoin(users, eq(appraisals.employeeId, users.id))
       .leftJoin(reviewCycles, eq(appraisals.cycleId, reviewCycles.id))
       .where(eq(appraisals.id, newAppraisal[0].id))
       .limit(1);
 
     const updatedByUser = await db
       .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
       })
-      .from(user)
-      .where(eq(user.id, currentUser.id))
+      .from(users)
+      .where(eq(users.id, currentUser.id))
       .limit(1);
 
+    const { appraisals: appraisal, users: employee, review_cycles: cycle } = enrichedAppraisal[0];
+
     const result = {
-      ...enrichedAppraisal[0],
+      ...appraisal,
+      employee: employee ? {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        image: employee.image,
+        role: employee.role,
+      } : null,
+      cycle: cycle ? {
+        id: cycle.id,
+        name: cycle.name,
+        status: cycle.status,
+        startDate: cycle.startDate,
+        endDate: cycle.endDate,
+      } : null,
       updatedByUser: updatedByUser[0] || null,
     };
 

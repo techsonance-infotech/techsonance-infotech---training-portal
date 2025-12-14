@@ -72,6 +72,31 @@ export default function CourseViewPage() {
     fetchCourseData()
   }, [courseId])
 
+  const updateAssignmentStatus = async (newStatus: string, newProgress: number) => {
+    try {
+      const method = assignment ? 'PUT' : 'POST';
+      const response = await fetch('/api/assignments', {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId: courseId,
+          status: newStatus,
+          progress: newProgress
+        })
+      });
+
+      if (!response.ok) throw new Error('Failed to update status');
+
+      const updatedAssignment = await response.json();
+      setAssignment(updatedAssignment);
+      toast.success(newStatus === 'completed' ? 'Course completed!' : 'Course started');
+
+      // Refresh dashboard data context if needed (optional)
+    } catch (error) {
+      toast.error('Failed to update course progress');
+    }
+  }
+
   const fetchCourseData = async () => {
     try {
       const [courseRes, topicsRes, activitiesRes, assignmentsRes] = await Promise.all([
@@ -162,7 +187,7 @@ export default function CourseViewPage() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <div 
+                  <div
                     className="text-sm text-muted-foreground line-clamp-3 prose prose-sm max-w-none dark:prose-invert"
                     dangerouslySetInnerHTML={{ __html: topic.content }}
                   />
@@ -272,14 +297,34 @@ export default function CourseViewPage() {
               <p className="text-muted-foreground">{course.description}</p>
             </div>
           </div>
-          {assignment && (
-            <Badge
-              variant="outline"
-              className={`${getStatusColor(assignment.status)} text-white border-none`}
-            >
-              {getStatusLabel(assignment.status)}
-            </Badge>
-          )}
+          <div className="flex items-center gap-3">
+            {assignment && (
+              <Badge
+                variant="outline"
+                className={`${getStatusColor(assignment.status)} text-white border-none`}
+              >
+                {getStatusLabel(assignment.status)}
+              </Badge>
+            )}
+
+            {(!assignment || assignment.status === 'not_started') && (
+              <Button
+                onClick={() => updateAssignmentStatus('in_progress', 10)}
+                className="bg-[#00C2FF] hover:bg-[#00C2FF]/90 text-white"
+              >
+                Start Learning
+              </Button>
+            )}
+
+            {assignment?.status === 'in_progress' && (
+              <Button
+                onClick={() => updateAssignmentStatus('completed', 100)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Mark as Completed
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Course Info Card */}
@@ -299,7 +344,7 @@ export default function CourseViewPage() {
                   <p className="text-sm text-muted-foreground mb-1">Progress</p>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 h-2 bg-[#0A1A2F]/10 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] transition-all duration-500"
                         style={{ width: `${assignment.progress}%` }}
                       />
@@ -346,7 +391,7 @@ export default function CourseViewPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div 
+                    <div
                       className="prose prose-sm max-w-none dark:prose-invert"
                       dangerouslySetInnerHTML={{ __html: selectedTopic.content }}
                     />

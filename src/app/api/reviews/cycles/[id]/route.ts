@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewCycles, reviewForms, user } from '@/db/schema';
+import { reviewCycles, reviewForms, users } from '@/db/schema';
 import { eq, and, count, avg, sql } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 // GET /api/reviews/cycles/[id] - Get single cycle with details
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -21,7 +21,8 @@ export async function GET(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    const cycleId = params.id;
+    const { id } = await params;
+    const cycleId = id;
 
     // Validate ID
     if (!cycleId || isNaN(parseInt(cycleId))) {
@@ -64,11 +65,11 @@ export async function GET(
       })
       .from(reviewForms)
       .leftJoin(
-        sql`${user} as employee`,
+        sql`${users} as employee`,
         eq(reviewForms.employeeId, sql`employee.id`)
       )
       .leftJoin(
-        sql`${user} as reviewer`,
+        sql`${users} as reviewer`,
         eq(reviewForms.reviewerId, sql`reviewer.id`)
       )
       .where(eq(reviewForms.cycleId, parseInt(cycleId)));
@@ -111,11 +112,11 @@ export async function GET(
 // PUT /api/reviews/cycles/[id] - Update cycle
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -125,7 +126,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const cycleId = params.id;
+
+
+    const { id } = await params;
+    const cycleId = id;
 
     // Validate ID
     if (!cycleId || isNaN(parseInt(cycleId))) {
@@ -218,11 +222,11 @@ export async function PUT(
 // DELETE /api/reviews/cycles/[id] - Delete cycle
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -232,75 +236,78 @@ export async function DELETE(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-    const cycleId = params.id;
+  }
 
-    // Validate ID
-    if (!cycleId || isNaN(parseInt(cycleId))) {
-      return NextResponse.json(
-        { error: 'Valid cycle ID is required', code: 'INVALID_ID' },
-        { status: 400 }
-      );
-    }
+    const { id } = await params;
+  const cycleId = id;
 
-    // Check if cycle exists
-    const existingCycle = await db
-      .select()
-      .from(reviewCycles)
-      .where(eq(reviewCycles.id, parseInt(cycleId)))
-      .limit(1);
-
-    if (existingCycle.length === 0) {
-      return NextResponse.json(
-        { error: 'Review cycle not found', code: 'CYCLE_NOT_FOUND' },
-        { status: 404 }
-      );
-    }
-
-    // Check if cycle has submitted forms
-    const submittedForms = await db
-      .select({ count: count() })
-      .from(reviewForms)
-      .where(
-        and(
-          eq(reviewForms.cycleId, parseInt(cycleId)),
-          eq(reviewForms.status, 'submitted')
-        )
-      );
-
-    if (submittedForms[0].count > 0) {
-      return NextResponse.json(
-        {
-          error: 'Cannot delete cycle with submitted forms',
-          code: 'HAS_SUBMITTED_FORMS',
-          submittedFormsCount: submittedForms[0].count,
-        },
-        { status: 409 }
-      );
-    }
-
-    // Delete all related forms first
-    await db
-      .delete(reviewForms)
-      .where(eq(reviewForms.cycleId, parseInt(cycleId)));
-
-    // Delete the cycle
-    const deleted = await db
-      .delete(reviewCycles)
-      .where(eq(reviewCycles.id, parseInt(cycleId)))
-      .returning();
-
+  // Validate ID
+  if (!cycleId || isNaN(parseInt(cycleId))) {
     return NextResponse.json(
-      {
-        message: 'Review cycle deleted successfully',
-        cycle: deleted[0],
-      },
-      { status: 200 }
-    );
-  } catch (error) {
-    console.error('DELETE cycle error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error: ' + (error as Error).message },
-      { status: 500 }
+      { error: 'Valid cycle ID is required', code: 'INVALID_ID' },
+      { status: 400 }
     );
   }
+
+  // Check if cycle exists
+  const existingCycle = await db
+    .select()
+    .from(reviewCycles)
+    .where(eq(reviewCycles.id, parseInt(cycleId)))
+    .limit(1);
+
+  if (existingCycle.length === 0) {
+    return NextResponse.json(
+      { error: 'Review cycle not found', code: 'CYCLE_NOT_FOUND' },
+      { status: 404 }
+    );
+  }
+
+  // Check if cycle has submitted forms
+  const submittedForms = await db
+    .select({ count: count() })
+    .from(reviewForms)
+    .where(
+      and(
+        eq(reviewForms.cycleId, parseInt(cycleId)),
+        eq(reviewForms.status, 'submitted')
+      )
+    );
+
+  if (submittedForms[0].count > 0) {
+    return NextResponse.json(
+      {
+        error: 'Cannot delete cycle with submitted forms',
+        code: 'HAS_SUBMITTED_FORMS',
+        submittedFormsCount: submittedForms[0].count,
+      },
+      { status: 409 }
+    );
+  }
+
+  // Delete all related forms first
+  await db
+    .delete(reviewForms)
+    .where(eq(reviewForms.cycleId, parseInt(cycleId)));
+
+  // Delete the cycle
+  const deleted = await db
+    .delete(reviewCycles)
+    .where(eq(reviewCycles.id, parseInt(cycleId)))
+    .returning();
+
+  return NextResponse.json(
+    {
+      message: 'Review cycle deleted successfully',
+      cycle: deleted[0],
+    },
+    { status: 200 }
+  );
+} catch (error) {
+  console.error('DELETE cycle error:', error);
+  return NextResponse.json(
+    { error: 'Internal server error: ' + (error as Error).message },
+    { status: 500 }
+  );
+}
 }

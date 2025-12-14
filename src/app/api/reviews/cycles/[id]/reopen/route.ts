@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewCycles } from '@/db/schema';
 import { eq } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Validate authentication
-    const authenticatedUser = await getCurrentUser(request);
+    const authenticatedUser = await getCurrentUser();
     if (!authenticatedUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'AUTH_REQUIRED' },
@@ -27,7 +27,7 @@ export async function POST(
     }
 
     // Validate ID parameter
-    const id = params.id;
+    const { id } = await params;
     if (!id || isNaN(parseInt(id))) {
       return NextResponse.json(
         { error: 'Valid cycle ID is required', code: 'INVALID_ID' },

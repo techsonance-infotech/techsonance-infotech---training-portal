@@ -22,6 +22,14 @@ async function main() {
             image: null,
         },
         {
+            email: 'jane.smith@company.com',
+            plainPassword: 'Employee123!',
+            name: 'Jane Smith',
+            role: 'employee',
+            emailVerified: true,
+            image: null,
+        },
+        {
             email: 'intern@company.com',
             plainPassword: 'Intern123!',
             name: 'Intern User',

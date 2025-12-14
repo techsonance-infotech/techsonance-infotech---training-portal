@@ -1,49 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { user, account } from '@/db/schema';
-import { eq, and, ne } from 'drizzle-orm';
+import { users } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { hashPassword } from '@/lib/auth-utils';
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = await params;
 
-    if (!id || id.trim() === '') {
-      return NextResponse.json(
-        { error: 'Valid ID is required', code: 'INVALID_ID' },
-        { status: 400 }
-      );
+    // Check if ID is valid (optional, but good practice if using uuids/ints)
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    const result = await db
-      .select({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        image: user.image,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      })
-      .from(user)
-      .where(eq(user.id, id))
-      .limit(1);
+    const start = Date.now();
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, id),
+    });
+    const duration = Date.now() - start;
+    if (duration > 1000) {
+      console.warn(`[Slow Query] Fetching user ${id} took ${duration}ms`);
+    }
 
-    if (result.length === 0) {
+    if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(result[0], { status: 200 });
+    // Exclude password hash from response
+    const { passwordHash, ...safeUser } = user;
+
+    return NextResponse.json(safeUser);
   } catch (error) {
-    console.error('GET error:', error);
+    console.error('Error fetching user:', error);
     return NextResponse.json(
-      { error: 'Internal server error: ' + (error as Error).message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -51,138 +47,41 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
-
-    if (!id || id.trim() === '') {
-      return NextResponse.json(
-        { error: 'Valid ID is required', code: 'INVALID_ID' },
-        { status: 400 }
-      );
-    }
-
+    const { id } = await params;
     const body = await request.json();
-    const { name, email, role } = body;
+    const { name, email, role, password } = body;
 
-    // Check if at least one field is provided
-    if (!name && !email && !role) {
-      return NextResponse.json(
-        {
-          error: 'At least one field to update is required',
-          code: 'NO_FIELDS_PROVIDED',
-        },
-        { status: 400 }
-      );
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.id, id)
+    });
+
+    if (!existingUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check if user exists
-    const existingUser = await db
-      .select()
-      .from(user)
-      .where(eq(user.id, id))
-      .limit(1);
+    const updateData: any = {
+      name,
+      email,
+      role,
+      updatedAt: new Date(),
+    };
 
-    if (existingUser.length === 0) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
+    if (password) {
+      updateData.passwordHash = await hashPassword(password);
     }
 
-    const updates: Partial<typeof user.$inferInsert> = {};
+    await db.update(users)
+      .set(updateData)
+      .where(eq(users.id, id));
 
-    // Validate and add name
-    if (name !== undefined) {
-      const trimmedName = name.trim();
-      if (trimmedName === '') {
-        return NextResponse.json(
-          { error: 'Name cannot be empty', code: 'INVALID_NAME' },
-          { status: 400 }
-        );
-      }
-      updates.name = trimmedName;
-    }
-
-    // Validate and add email
-    if (email !== undefined) {
-      const trimmedEmail = email.trim().toLowerCase();
-      if (trimmedEmail === '') {
-        return NextResponse.json(
-          { error: 'Email cannot be empty', code: 'INVALID_EMAIL' },
-          { status: 400 }
-        );
-      }
-
-      // Check for duplicate email
-      const duplicateEmail = await db
-        .select()
-        .from(user)
-        .where(and(eq(user.email, trimmedEmail), ne(user.id, id)))
-        .limit(1);
-
-      if (duplicateEmail.length > 0) {
-        return NextResponse.json(
-          { error: 'Email already exists', code: 'DUPLICATE_EMAIL' },
-          { status: 409 }
-        );
-      }
-
-      updates.email = trimmedEmail;
-
-      // Update account.accountId if email is being changed
-      if (trimmedEmail !== existingUser[0].email) {
-        await db
-          .update(account)
-          .set({
-            accountId: trimmedEmail,
-            updatedAt: new Date(),
-          })
-          .where(eq(account.userId, id));
-      }
-    }
-
-    // Validate and add role
-    if (role !== undefined) {
-      const trimmedRole = role.trim();
-      const validRoles = ['admin', 'employee', 'intern'];
-      if (!validRoles.includes(trimmedRole)) {
-        return NextResponse.json(
-          {
-            error: 'Role must be admin, employee, or intern',
-            code: 'INVALID_ROLE',
-          },
-          { status: 400 }
-        );
-      }
-      updates.role = trimmedRole;
-    }
-
-    // Add updatedAt timestamp
-    updates.updatedAt = new Date();
-
-    // Update user
-    const updatedUser = await db
-      .update(user)
-      .set(updates)
-      .where(eq(user.id, id))
-      .returning({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        image: user.image,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      });
-
-    return NextResponse.json(updatedUser[0], { status: 200 });
+    return NextResponse.json({ success: true, message: 'User updated successfully' });
   } catch (error) {
-    console.error('PUT error:', error);
+    console.error('Error updating user:', error);
     return NextResponse.json(
-      { error: 'Internal server error: ' + (error as Error).message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
@@ -190,57 +89,29 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = await params;
 
-    if (!id || id.trim() === '') {
-      return NextResponse.json(
-        { error: 'Valid ID is required', code: 'INVALID_ID' },
-        { status: 400 }
-      );
-    }
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.id, id)
+    });
 
-    // Check if user exists
-    const existingUser = await db
-      .select()
-      .from(user)
-      .where(eq(user.id, id))
-      .limit(1);
-
-    if (existingUser.length === 0) {
+    if (!existingUser) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
       );
     }
 
-    // Delete associated accounts first (cascade will handle this, but explicit is safer)
-    await db.delete(account).where(eq(account.userId, id));
+    await db.delete(users).where(eq(users.id, id));
 
-    // Delete user
-    const deletedUser = await db
-      .delete(user)
-      .where(eq(user.id, id))
-      .returning({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      });
-
-    return NextResponse.json(
-      {
-        message: 'User deleted successfully',
-        id: id,
-        deletedUser: deletedUser[0],
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('DELETE error:', error);
+    console.error('Error deleting user:', error);
     return NextResponse.json(
-      { error: 'Internal server error: ' + (error as Error).message },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

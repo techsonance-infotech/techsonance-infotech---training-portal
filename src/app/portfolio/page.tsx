@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -38,7 +39,7 @@ import {
   X,
 } from "lucide-react"
 import { toast } from "sonner"
-import { useSession } from "@/lib/auth-client"
+import { useAuth } from "@/hooks/use-auth"
 
 interface PortfolioItem {
   id: number
@@ -58,7 +59,8 @@ const categories = [
 ]
 
 export default function PortfolioPage() {
-  const { data: session } = useSession()
+  const router = useRouter()
+  const { user } = useAuth()
   const [items, setItems] = useState<PortfolioItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -71,21 +73,34 @@ export default function PortfolioPage() {
   })
 
   useEffect(() => {
-    if (session?.user) {
-      fetchPortfolio()
+    if (user) {
+      if (user.role !== 'employee' && user.role !== 'intern') {
+        router.push('/dashboard')
+        return
+      }
+      fetchPortfolioData()
     }
-  }, [session])
+  }, [user, router])
 
-  const fetchPortfolio = async () => {
+  const fetchPortfolioData = async () => {
     setIsLoading(true)
     try {
-      // In a real app, you'd get the actual user ID from the database
-      // For demo purposes, using user ID 2
-      const response = await fetch("/api/portfolio/2")
+      const response = await fetch(`/api/portfolio/${user?.id}`)
+      if (!response.ok) {
+        // If endpoint not found or error, try fallback or handle error
+        // Ideally we want to fail gracefully.
+        // checking if status is 404, maybe the user has no portfolio yet?
+        if (response.status === 404) {
+          setItems([])
+          return
+        }
+        throw new Error("Failed to fetch")
+      }
       const data = await response.json()
       setItems(data.items || [])
     } catch (error) {
-      toast.error("Failed to load portfolio")
+      //   toast.error("Failed to load portfolio")
+      console.error(error)
     } finally {
       setIsLoading(false)
     }
@@ -104,7 +119,7 @@ export default function PortfolioPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: 2, // In real app, use actual user ID
+          userId: user?.id,
           category: newItem.category,
           title: newItem.title,
           description: newItem.description || null,
@@ -131,10 +146,6 @@ export default function PortfolioPage() {
 
   const getItemsByCategory = (category: string) => {
     return filteredItems.filter((item) => item.category === category)
-  }
-
-  const getCategoryInfo = (category: string) => {
-    return categories.find((cat) => cat.value === category)
   }
 
   const exportToCV = () => {
@@ -372,8 +383,8 @@ export default function PortfolioPage() {
             <div className="border border-[#00C2FF]/20 rounded-lg p-6 bg-gradient-to-br from-background via-[#00C2FF]/5 to-background space-y-6">
               {/* Header */}
               <div className="text-center pb-6 border-b border-[#00C2FF]/20">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">{session?.user?.name || "Your Name"}</h2>
-                <p className="text-muted-foreground">{session?.user?.email || "your.email@company.com"}</p>
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] bg-clip-text text-transparent">{user?.name || "Your Name"}</h2>
+                <p className="text-muted-foreground">{user?.email || "your.email@company.com"}</p>
                 <p className="text-sm text-muted-foreground mt-1">Employee Portfolio</p>
               </div>
 

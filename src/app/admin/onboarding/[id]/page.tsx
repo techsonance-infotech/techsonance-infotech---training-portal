@@ -17,15 +17,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { 
-  ArrowLeft, 
-  CheckCircle, 
-  XCircle, 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Briefcase, 
+import {
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Briefcase,
   GraduationCap,
   CreditCard,
   Shield,
@@ -33,11 +33,12 @@ import {
   FileText,
   Calendar,
   Clock,
-  Edit
+  Edit,
+  Copy
 } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { toast } from "sonner"
-import { useSession } from "@/lib/auth-client"
+import { useAuth } from "@/hooks/use-auth"
 
 interface OnboardingSubmission {
   id: number
@@ -45,7 +46,7 @@ interface OnboardingSubmission {
   submittedAt: string
   reviewedBy: string | null
   reviewedAt: string | null
-  
+
   // Section 1: Personal Information
   fullName: string
   dateOfBirth: string
@@ -57,7 +58,7 @@ interface OnboardingSubmission {
   emergencyContactName: string
   emergencyContactRelationship: string
   emergencyContactPhone: string
-  
+
   // Section 2: Identity & Verification
   aadhaarNumber: string
   panNumber: string
@@ -65,7 +66,7 @@ interface OnboardingSubmission {
   panUploadUrl: string | null
   passportUploadUrl: string | null
   photoUploadUrl: string
-  
+
   // Section 3: Employment Details
   jobTitle: string
   department: string | null
@@ -73,13 +74,13 @@ interface OnboardingSubmission {
   dateOfJoining: string
   employmentType: string
   workLocation: string
-  
+
   // Section 4: Educational & Skill Details
   highestQualification: string | null
   degreeCertificateUrl: string | null
   technicalSkills: string | null
   certificationsUrls: string | null
-  
+
   // Section 5: Previous Employment
   previousCompany: string | null
   previousJobTitle: string | null
@@ -87,26 +88,26 @@ interface OnboardingSubmission {
   experienceLetterUrl: string | null
   uanNumber: string | null
   lastSalarySlipUrl: string | null
-  
+
   // Section 6: Bank Details
   bankAccountNumber: string
   ifscCode: string
   bankNameBranch: string
   cancelledChequeUrl: string
-  
+
   // Section 7: Tax Information
   taxRegime: string
   investmentProofsUrl: string | null
-  
+
   // Section 8: IT & System Setup
   laptopRequired: string
   softwareAccess: string | null
   tshirtSize: string | null
-  
+
   // Section 9: Policy Agreements
   policyAgreements: string
   signature: string
-  
+
   // Section 10: Additional Information
   bloodGroup: string | null
   linkedinProfile: string | null
@@ -115,7 +116,7 @@ interface OnboardingSubmission {
   workPreferences: string | null
   careerGoals: string | null
   hobbies: string | null
-  
+
   reviewer: {
     id: string
     name: string
@@ -127,12 +128,16 @@ interface OnboardingSubmission {
 export default function OnboardingDetailPage() {
   const router = useRouter()
   const params = useParams()
-  const { data: session } = useSession()
+  const { user } = useAuth()
   const [submission, setSubmission] = useState<OnboardingSubmission | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [actionDialogOpen, setActionDialogOpen] = useState(false)
   const [actionType, setActionType] = useState<"approve" | "reject" | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Credentials Display
+  const [showCredentials, setShowCredentials] = useState(false)
+  const [newCredentials, setNewCredentials] = useState<{ email: string, password: string } | null>(null)
 
   useEffect(() => {
     if (params.id) {
@@ -143,15 +148,10 @@ export default function OnboardingDetailPage() {
   const fetchSubmission = async () => {
     setIsLoading(true)
     try {
-      const token = localStorage.getItem("bearer_token")
-      const response = await fetch(`/api/onboarding/${params.id}`, {
-        headers: {
-          "Authorization": `Bearer ${token}`
-        }
-      })
-      
+      const response = await fetch(`/api/onboarding/${params.id}`)
+
       if (!response.ok) throw new Error("Failed to load submission")
-      
+
       const data = await response.json()
       setSubmission(data)
     } catch (error) {
@@ -163,20 +163,18 @@ export default function OnboardingDetailPage() {
   }
 
   const handleStatusUpdate = async (newStatus: "approved" | "rejected") => {
-    if (!submission || !session?.user?.id) return
+    if (!submission || !user?.id) return
 
     setIsProcessing(true)
     try {
-      const token = localStorage.getItem("bearer_token")
       const response = await fetch(`/api/onboarding/${submission.id}/status`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           status: newStatus,
-          reviewerId: session.user.id
+          reviewerId: user.id
         })
       })
 
@@ -190,6 +188,15 @@ export default function OnboardingDetailPage() {
       toast.success(`Submission ${newStatus} successfully`)
       setActionDialogOpen(false)
       setActionType(null)
+
+      // Check for temporary password
+      if (updatedSubmission.temporaryPassword) {
+        setNewCredentials({
+          email: updatedSubmission.personalEmail,
+          password: updatedSubmission.temporaryPassword
+        })
+        setShowCredentials(true)
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to update submission status")
     } finally {
@@ -813,11 +820,67 @@ export default function OnboardingDetailPage() {
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={() => actionType && handleStatusUpdate(actionType)}
+                onClick={() => actionType && handleStatusUpdate(actionType === "approve" ? "approved" : "rejected")}
                 disabled={isProcessing}
                 className={actionType === "reject" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
               >
                 {isProcessing ? "Processing..." : actionType === "approve" ? "Approve" : "Reject"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Credentials Dialog */}
+        <AlertDialog open={showCredentials} onOpenChange={setShowCredentials}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-green-600 flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Employee Account Created
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                The onboarding request has been approved and a user account has been automatically created.
+                Please share these temporary credentials with the employee securely.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            {newCredentials && (
+              <div className="bg-muted p-4 rounded-md space-y-3 border">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Login Email</label>
+                  <div className="flex items-center justify-between mt-1">
+                    <code className="text-sm font-mono font-bold">{newCredentials.email}</code>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      navigator.clipboard.writeText(newCredentials.email)
+                      toast.success("Email copied")
+                    }}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <Separator />
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground uppercase">Temporary Password</label>
+                  <div className="flex items-center justify-between mt-1">
+                    <code className="text-sm font-mono font-bold text-primary">{newCredentials.password}</code>
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      navigator.clipboard.writeText(newCredentials.password)
+                      toast.success("Password copied")
+                    }}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-yellow-500/10 text-yellow-600 p-3 rounded text-xs">
+              <strong>Note:</strong> The employee will be asked to change this password upon their first login (if implemented) or can use "Forgot Password".
+            </div>
+
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => setShowCredentials(false)}>
+                Done
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -1,55 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { user, account } from '@/db/schema';
-import { eq, like, or, and, sql } from 'drizzle-orm';
+import { users } from '@/db/schema';
+import { eq, like, or, and, desc, ne, not } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import bcrypt from 'bcryptjs';
+import { hashPassword } from '@/lib/auth-utils';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
+
     const page = parseInt(searchParams.get('page') ?? '1');
     const limit = Math.min(parseInt(searchParams.get('limit') ?? '10'), 100);
     const offset = (page - 1) * limit;
     const role = searchParams.get('role');
     const search = searchParams.get('search');
+    const status = searchParams.get('status');
 
     // Start with base query builder
     let queryBuilder = db.select({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      emailVerified: user.emailVerified,
-      image: user.image,
-      role: user.role,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    }).from(user).$dynamic();
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      image: users.image,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    }).from(users).orderBy(desc(users.createdAt)).$dynamic();
 
     const conditions = [];
 
     if (role) {
       if (!['admin', 'employee', 'intern'].includes(role)) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: "Invalid role filter. Must be 'admin', 'employee', or 'intern'",
-          code: "INVALID_ROLE_FILTER" 
+          code: "INVALID_ROLE_FILTER"
         }, { status: 400 });
       }
-      conditions.push(eq(user.role, role));
+      conditions.push(eq(users.role, role));
     }
 
     if (search) {
       const searchTerm = `%${search.trim()}%`;
       conditions.push(
         or(
-          like(user.name, searchTerm),
-          like(user.email, searchTerm)
+          like(users.name, searchTerm),
+          like(users.email, searchTerm)
         )
       );
     }
 
+    if (status) {
+      if (status.startsWith('!')) {
+        const val = status.substring(1);
+        console.log('[API] Adding NOT_EQ filter:', val);
+        conditions.push(not(eq(users.status, val)));
+      } else {
+        conditions.push(eq(users.status, status));
+      }
+    }
+
     if (conditions.length > 0) {
+      console.log('[API] Query conditions count:', conditions.length);
       if (conditions.length === 1) {
         queryBuilder = queryBuilder.where(conditions[0]);
       } else {
@@ -62,143 +73,155 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(results, { status: 200 });
   } catch (error) {
     console.error('GET /api/users error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + (error as Error).message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + (error as Error).message
     }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = randomUUID();
+  console.time(`[${requestId}] POST /api/users total`);
+
   try {
+    console.log(`[${requestId}] Starting user creation`);
+
     const body = await request.json();
-    const { name, email, password, role } = body;
+    console.log(`[${requestId}] Body parsed`);
+
+    const { firstName, lastName, email, password, role } = body;
 
     // Validate required fields
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return NextResponse.json({ 
-        error: "Name is required and must be a non-empty string",
-        code: "MISSING_NAME" 
+    if (!firstName || typeof firstName !== 'string' || firstName.trim() === '') {
+      return NextResponse.json({
+        error: "First Name is required",
+        code: "MISSING_FIRST_NAME"
+      }, { status: 400 });
+    }
+
+    if (!lastName || typeof lastName !== 'string' || lastName.trim() === '') {
+      return NextResponse.json({
+        error: "Last Name is required",
+        code: "MISSING_LAST_NAME"
       }, { status: 400 });
     }
 
     if (!email || typeof email !== 'string' || email.trim() === '') {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Email is required and must be a non-empty string",
-        code: "MISSING_EMAIL" 
+        code: "MISSING_EMAIL"
       }, { status: 400 });
     }
 
     if (!password || typeof password !== 'string' || password.trim() === '') {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Password is required and must be a non-empty string",
-        code: "MISSING_PASSWORD" 
+        code: "MISSING_PASSWORD"
       }, { status: 400 });
     }
 
-    if (!role || typeof role !== 'string' || role.trim() === '') {
-      return NextResponse.json({ 
-        error: "Role is required and must be a non-empty string",
-        code: "MISSING_ROLE" 
+    // Role validation - default to intern if not provided, or validate if provided
+    const requestedRole = role ? role.trim().toLowerCase() : 'intern';
+
+    // Validate role (cannot create admin users via API for public registration)
+    if (requestedRole === 'admin') {
+      return NextResponse.json({
+        error: "Cannot create admin users via API",
+        code: "INVALID_ROLE"
+      }, { status: 400 });
+    }
+
+    if (!['employee', 'intern'].includes(requestedRole)) {
+      return NextResponse.json({
+        error: "Role must be employee or intern",
+        code: "INVALID_ROLE"
       }, { status: 400 });
     }
 
     // Sanitize inputs
-    const trimmedName = name.trim();
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const fullName = `${trimmedFirstName} ${trimmedLastName}`;
     const trimmedEmail = email.trim().toLowerCase();
     const trimmedPassword = password.trim();
-    const trimmedRole = role.trim().toLowerCase();
 
     // Validate email format (basic regex)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Invalid email format",
-        code: "INVALID_EMAIL_FORMAT" 
+        code: "INVALID_EMAIL_FORMAT"
       }, { status: 400 });
     }
 
     // Validate password length
     if (trimmedPassword.length < 8) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Password must be at least 8 characters long",
-        code: "PASSWORD_TOO_SHORT" 
+        code: "PASSWORD_TOO_SHORT"
       }, { status: 400 });
     }
 
-    // Validate role (cannot create admin users via API)
-    if (trimmedRole === 'admin') {
-      return NextResponse.json({ 
-        error: "Cannot create admin users via API",
-        code: "INVALID_ROLE" 
-      }, { status: 400 });
-    }
-
-    if (!['employee', 'intern'].includes(trimmedRole)) {
-      return NextResponse.json({ 
-        error: "Role must be employee or intern",
-        code: "INVALID_ROLE" 
-      }, { status: 400 });
-    }
-
+    console.log(`[${requestId}] Validation passed. Checking existing user...`);
     // Check if email already exists
     const existingUser = await db.select()
-      .from(user)
-      .where(eq(user.email, trimmedEmail))
+      .from(users)
+      .where(eq(users.email, trimmedEmail))
       .limit(1);
+    console.log(`[${requestId}] Existing user check complete. Result:`, existingUser.length > 0);
 
     if (existingUser.length > 0) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         error: "Email already exists",
-        code: "DUPLICATE_EMAIL" 
+        code: "DUPLICATE_EMAIL"
       }, { status: 409 });
     }
 
     // Generate UUID for user
     const userId = randomUUID();
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(trimmedPassword, 10);
+    // Hash password using new auth utils
+    console.time(`[${requestId}] hashPassword`);
+    const hashedPassword = await hashPassword(trimmedPassword);
+    console.timeEnd(`[${requestId}] hashPassword`);
 
-    // Insert user
-    const newUser = await db.insert(user)
+    const now = new Date();
+
+    console.log(`[${requestId}] Inserting user into DB...`);
+    console.time(`[${requestId}] db.insert`);
+    // Insert user with INACTIVE status
+    const newUser = await db.insert(users)
       .values({
         id: userId,
-        name: trimmedName,
+        name: fullName,
         email: trimmedEmail,
-        emailVerified: false,
+        passwordHash: hashedPassword,
         image: null,
-        role: trimmedRole,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        role: requestedRole,
+        status: 'inactive', // Default to inactive for public registration
+        createdAt: now,
+        updatedAt: now,
       })
       .returning({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        image: user.image,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        role: users.role,
+        status: users.status,
+        image: users.image,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
       });
+    console.timeEnd(`[${requestId}] db.insert`);
+    console.log(`[${requestId}] User inserted successfully.`);
 
-    // Insert account with hashed password
-    await db.insert(account)
-      .values({
-        id: randomUUID(),
-        accountId: trimmedEmail,
-        providerId: 'credential',
-        userId: userId,
-        password: hashedPassword,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
+    console.timeEnd(`[${requestId}] POST /api/users total`);
     return NextResponse.json(newUser[0], { status: 201 });
   } catch (error) {
-    console.error('POST /api/users error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + (error as Error).message 
+    console.timeEnd(`[${requestId}] POST /api/users total`);
+    console.error(`[${requestId}] POST /api/users error:`, error);
+    return NextResponse.json({
+      error: 'Internal server error: ' + (error as Error).message
     }, { status: 500 });
   }
 }

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewerAssignments, reviewCycles, user, reviewNotifications, reviewForms } from '@/db/schema';
+import { reviewerAssignments, reviewCycles, users, reviewNotifications, reviewForms } from '@/db/schema';
 import { eq, and, desc, inArray } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 const VALID_REVIEWER_TYPES = ['self', 'peer', 'client', 'manager'];
 
@@ -12,9 +12,9 @@ export async function GET(
 ) {
   try {
     const { id: cycleIdParam } = await params;
-    
+
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -47,15 +47,15 @@ export async function GET(
 
     // Build query conditions
     const conditions = [eq(reviewerAssignments.cycleId, cycleId)];
-    
+
     if (employeeId) {
       conditions.push(eq(reviewerAssignments.employeeId, employeeId));
     }
-    
+
     if (reviewerId) {
       conditions.push(eq(reviewerAssignments.reviewerId, reviewerId));
     }
-    
+
     if (status) {
       conditions.push(eq(reviewerAssignments.status, status));
     }
@@ -72,15 +72,15 @@ export async function GET(
     const allUserIds = [...new Set([...employeeIds, ...reviewerIds])];
 
     // Fetch user details
-    let users: any[] = [];
+    let usersData: any[] = [];
     if (allUserIds.length > 0) {
-      users = await db.select()
-        .from(user)
-        .where(inArray(user.id, allUserIds));
+      usersData = await db.select()
+        .from(users)
+        .where(inArray(users.id, allUserIds));
     }
 
     // Create user map for quick lookup
-    const userMap = new Map(users.map(u => [u.id, { id: u.id, name: u.name, email: u.email, role: u.role }]));
+    const userMap = new Map(usersData.map(u => [u.id, { id: u.id, name: u.name, email: u.email, role: u.role }]));
 
     // Enrich assignments with user details
     const enrichedAssignments = assignments.map(assignment => ({
@@ -93,8 +93,8 @@ export async function GET(
 
   } catch (error: any) {
     console.error('GET assignments error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + error.message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + error.message
     }, { status: 500 });
   }
 }
@@ -105,9 +105,9 @@ export async function POST(
 ) {
   try {
     const { id: cycleIdParam } = await params;
-    
+
     // Validate authentication
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
@@ -128,9 +128,9 @@ export async function POST(
 
     // Validate request structure
     if (!assignments || !Array.isArray(assignments) || assignments.length === 0) {
-      return NextResponse.json({ 
-        error: 'Assignments array is required and must not be empty', 
-        code: 'INVALID_ASSIGNMENTS' 
+      return NextResponse.json({
+        error: 'Assignments array is required and must not be empty',
+        code: 'INVALID_ASSIGNMENTS'
       }, { status: 400 });
     }
 
@@ -145,9 +145,9 @@ export async function POST(
     }
 
     if (cycle[0].status === 'locked' || cycle[0].status === 'completed') {
-      return NextResponse.json({ 
-        error: 'Cannot assign reviewers to a locked or completed cycle', 
-        code: 'CYCLE_LOCKED' 
+      return NextResponse.json({
+        error: 'Cannot assign reviewers to a locked or completed cycle',
+        code: 'CYCLE_LOCKED'
       }, { status: 400 });
     }
 
@@ -171,27 +171,27 @@ export async function POST(
     });
 
     if (validationErrors.length > 0) {
-      return NextResponse.json({ 
-        error: 'Validation failed', 
+      return NextResponse.json({
+        error: 'Validation failed',
         code: 'VALIDATION_ERROR',
-        details: validationErrors 
+        details: validationErrors
       }, { status: 400 });
     }
 
     // Validate all user IDs exist
     const userIds = Array.from(userIdsToValidate);
-    const existingUsers = await db.select({ id: user.id, name: user.name })
-      .from(user)
-      .where(inArray(user.id, userIds));
+    const existingUsers = await db.select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, userIds));
 
     const existingUserIds = new Set(existingUsers.map(u => u.id));
     const missingUserIds = userIds.filter(id => !existingUserIds.has(id));
 
     if (missingUserIds.length > 0) {
-      return NextResponse.json({ 
-        error: 'Some user IDs do not exist', 
+      return NextResponse.json({
+        error: 'Some user IDs do not exist',
         code: 'INVALID_USER_IDS',
-        details: { missingUserIds } 
+        details: { missingUserIds }
       }, { status: 400 });
     }
 
@@ -213,10 +213,10 @@ export async function POST(
     });
 
     if (duplicates.length > 0) {
-      return NextResponse.json({ 
-        error: 'Duplicate assignments detected', 
+      return NextResponse.json({
+        error: 'Duplicate assignments detected',
         code: 'DUPLICATE_ASSIGNMENTS',
-        details: duplicates 
+        details: duplicates
       }, { status: 409 });
     }
 
@@ -274,7 +274,7 @@ export async function POST(
     const notificationsToCreate = createdAssignments.map(assignment => {
       const key = `${assignment.employeeId}-${assignment.reviewerId}-${assignment.reviewerType}`;
       const formId = formMap.get(key);
-      
+
       return {
         userId: assignment.reviewerId,
         notificationType: 'review_requested',
@@ -310,8 +310,8 @@ export async function POST(
 
   } catch (error: any) {
     console.error('POST assignments error:', error);
-    return NextResponse.json({ 
-      error: 'Internal server error: ' + error.message 
+    return NextResponse.json({
+      error: 'Internal server error: ' + error.message
     }, { status: 500 });
   }
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { reviewNotifications } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 export async function PUT(
   request: NextRequest,
@@ -10,7 +10,7 @@ export async function PUT(
 ) {
   try {
     // Authentication check
-    const user = await getCurrentUser(request);
+    const user = await getCurrentUser();
     if (!user) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },

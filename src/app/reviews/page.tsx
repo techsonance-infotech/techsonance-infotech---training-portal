@@ -4,39 +4,39 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/dashboard-layout"
 import { PageLoader } from "@/components/ui/loading-spinner"
-import { useSession } from "@/lib/auth-client"
+import { useAuth } from "@/hooks/use-auth"
 import { AdminReviewDashboard } from "@/components/reviews/admin-review-dashboard"
 import { HRReviewDashboard } from "@/components/reviews/hr-review-dashboard"
 import { EmployeeReviewDashboard } from "@/components/reviews/employee-review-dashboard"
 
 export default function ReviewsPage() {
   const router = useRouter()
-  const { data: session, isPending } = useSession()
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, loading } = useAuth()
+  const [isInitializing, setIsInitializing] = useState(true)
 
   useEffect(() => {
-    if (!isPending) {
-      if (!session?.user) {
+    if (!loading) {
+      if (!user) {
         router.push("/login")
       } else {
-        setIsLoading(false)
+        setIsInitializing(false)
       }
     }
-  }, [session, isPending, router])
+  }, [user, loading, router])
 
-  if (isPending || isLoading) {
+  if (loading || isInitializing) {
     return (
-      <DashboardLayout userRole={session?.user?.role || "employee"}>
+      <DashboardLayout userRole={user?.role as "admin" | "employee" | "intern" || "employee"}>
         <PageLoader text="Loading reviews..." />
       </DashboardLayout>
     )
   }
 
-  if (!session?.user) {
+  if (!user) {
     return null
   }
 
-  const userRole = session.user.role?.toLowerCase() || "employee"
+  const userRole = user.role?.toLowerCase() || "employee"
 
   return (
     <DashboardLayout userRole={userRole as "admin" | "employee" | "intern"}>

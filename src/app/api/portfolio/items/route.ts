@@ -19,19 +19,19 @@ export async function POST(request: NextRequest) {
     // Validate required fields
     if (!userId) {
       return NextResponse.json(
-        { 
+        {
           error: 'userId is required',
-          code: 'MISSING_USER_ID' 
+          code: 'MISSING_USER_ID'
         },
         { status: 400 }
       );
     }
 
-    if (!Number.isInteger(userId)) {
+    if (typeof userId !== 'string') {
       return NextResponse.json(
-        { 
-          error: 'userId must be a valid integer',
-          code: 'INVALID_USER_ID' 
+        {
+          error: 'userId must be a string',
+          code: 'INVALID_USER_ID'
         },
         { status: 400 }
       );
@@ -39,9 +39,9 @@ export async function POST(request: NextRequest) {
 
     if (!category) {
       return NextResponse.json(
-        { 
+        {
           error: 'category is required',
-          code: 'MISSING_CATEGORY' 
+          code: 'MISSING_CATEGORY'
         },
         { status: 400 }
       );
@@ -49,9 +49,9 @@ export async function POST(request: NextRequest) {
 
     if (!VALID_CATEGORIES.includes(category)) {
       return NextResponse.json(
-        { 
+        {
           error: `category must be one of: ${VALID_CATEGORIES.join(', ')}`,
-          code: 'INVALID_CATEGORY' 
+          code: 'INVALID_CATEGORY'
         },
         { status: 400 }
       );
@@ -59,19 +59,19 @@ export async function POST(request: NextRequest) {
 
     if (!title || typeof title !== 'string' || title.trim() === '') {
       return NextResponse.json(
-        { 
+        {
           error: 'title is required and must be a non-empty string',
-          code: 'INVALID_TITLE' 
+          code: 'INVALID_TITLE'
         },
         { status: 400 }
       );
     }
 
-    if (description !== undefined && typeof description !== 'string') {
+    if (description !== undefined && description !== null && typeof description !== 'string') {
       return NextResponse.json(
-        { 
-          error: 'description must be a string',
-          code: 'INVALID_DESCRIPTION' 
+        {
+          error: 'description must be a string or null',
+          code: 'INVALID_DESCRIPTION'
         },
         { status: 400 }
       );

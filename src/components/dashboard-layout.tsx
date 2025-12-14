@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { authClient, useSession } from "@/lib/auth-client"
+import { useAuth } from "@/hooks/use-auth"
+import { LoadingSpinner, PageLoader, FullScreenLoader } from "@/components/ui/loading-spinner"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -31,6 +32,7 @@ import {
   Moon,
   Sun,
   UserCog,
+  UserPlus,
 } from "lucide-react"
 import { useTheme } from "@/components/theme-provider"
 import { toast } from "sonner"
@@ -43,37 +45,19 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { data: session, isPending, refetch } = useSession()
+  const { user, loading, logout } = useAuth()
   const { theme, setTheme } = useTheme()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
-    if (!isPending && !session?.user) {
+    if (!loading && !user) {
       router.push("/login")
     }
-  }, [session, isPending, router])
+  }, [user, loading, router])
 
   const handleSignOut = async () => {
-    const token = localStorage.getItem("bearer_token")
-
-    const { error } = await authClient.signOut({
-      fetchOptions: {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
-    })
-
-    if (error?.code) {
-      toast.error("Sign out failed", {
-        description: error.code,
-      })
-    } else {
-      localStorage.removeItem("bearer_token")
-      toast.success("Signed out successfully")
-      refetch()
-      router.push("/login")
-    }
+    await logout()
+    toast.success("Signed out successfully")
   }
 
   const toggleTheme = () => {
@@ -95,7 +79,7 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
     },
     {
       name: "Policies",
-      href: userRole === "admin" ? "/admin/policies" : "/dashboard/policies",
+      href: userRole === "admin" ? "/admin/policies" : "/policies",
       icon: FileText,
       roles: ["admin", "employee", "intern"],
     },
@@ -110,6 +94,12 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
       href: "/reviews",
       icon: MessageSquare,
       roles: ["admin", "hr", "employee", "intern"],
+    },
+    {
+      name: "Registrations",
+      href: "/admin/registrations",
+      icon: UserPlus,
+      roles: ["admin"],
     },
     {
       name: "Users",
@@ -129,27 +119,20 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
     item.roles.includes(userRole || "employee")
   )
 
-  if (isPending) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-[#00C2FF]/20 via-[#0A1A2F]/40 to-[#0A1A2F]">
-        <div className="space-y-4 text-center">
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] mx-auto animate-pulse" />
-          <Skeleton className="h-4 w-32 mx-auto" />
-        </div>
-      </div>
-    )
+  if (loading) {
+    return <FullScreenLoader text="Verifying session..." />
   }
 
-  if (!session?.user) {
+  if (!user) {
     return null
   }
 
-  const userInitials = session.user.name
-    ? session.user.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
+  const userInitials = user.name
+    ? user.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
     : "U"
 
   const Sidebar = () => (
@@ -178,11 +161,10 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
               key={item.name}
               href={item.href}
               onClick={() => setIsMobileMenuOpen(false)}
-              className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] text-white shadow-lg"
-                  : "text-muted-foreground hover:bg-[#00C2FF]/10 hover:text-[#00C2FF]"
-              }`}
+              className={`flex items-center space-x-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${isActive
+                ? "bg-gradient-to-r from-[#00C2FF] to-[#0A1A2F] text-white shadow-lg"
+                : "text-muted-foreground hover:bg-[#00C2FF]/10 hover:text-[#00C2FF]"
+                }`}
             >
               <item.icon className="h-5 w-5" />
               <span>{item.name}</span>
@@ -196,11 +178,11 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <Avatar className="h-9 w-9 border-2 border-[#00C2FF]/30">
-              <AvatarImage src={session.user.image || undefined} />
+              <AvatarImage src={user.image || undefined} />
               <AvatarFallback className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white">{userInitials}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{session.user.name}</p>
+              <p className="text-sm font-medium truncate">{user.name}</p>
               <p className="text-xs text-[#00C2FF] truncate capitalize">{userRole}</p>
             </div>
           </div>
@@ -254,7 +236,7 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="hover:bg-[#00C2FF]/10">
                 <Avatar className="h-8 w-8 border-2 border-[#00C2FF]/30">
-                  <AvatarImage src={session.user.image || undefined} />
+                  <AvatarImage src={user.image || undefined} />
                   <AvatarFallback className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white">{userInitials}</AvatarFallback>
                 </Avatar>
               </Button>
@@ -262,8 +244,8 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
             <DropdownMenuContent align="end" className="w-56 border-[#00C2FF]/20">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{session.user.name}</p>
-                  <p className="text-xs text-muted-foreground">{session.user.email}</p>
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
@@ -296,7 +278,7 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
               {pathname === "/admin" || pathname === "/dashboard"
                 ? "Dashboard"
                 : pathname.split("/").pop()?.charAt(0).toUpperCase() +
-                  pathname.split("/").pop()?.slice(1) || "Dashboard"}
+                pathname.split("/").pop()?.slice(1) || "Dashboard"}
             </h1>
           </div>
 
@@ -313,17 +295,17 @@ export function DashboardLayout({ children, userRole }: DashboardLayoutProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-2 hover:bg-[#00C2FF]/10">
                   <Avatar className="h-8 w-8 border-2 border-[#00C2FF]/30">
-                    <AvatarImage src={session.user.image || undefined} />
+                    <AvatarImage src={user.image || undefined} />
                     <AvatarFallback className="bg-gradient-to-br from-[#00C2FF] to-[#0A1A2F] text-white">{userInitials}</AvatarFallback>
                   </Avatar>
-                  <span className="text-sm font-medium">{session.user.name}</span>
+                  <span className="text-sm font-medium">{user.name}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 border-[#00C2FF]/20">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium">{session.user.name}</p>
-                    <p className="text-xs text-muted-foreground">{session.user.email}</p>
+                    <p className="text-sm font-medium">{user.name}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
                     <p className="text-xs text-[#00C2FF] capitalize">{userRole}</p>
                   </div>
                 </DropdownMenuLabel>

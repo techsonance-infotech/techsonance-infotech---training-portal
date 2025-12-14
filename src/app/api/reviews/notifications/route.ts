@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { reviewNotifications, user } from '@/db/schema';
+import { reviewNotifications, users } from '@/db/schema';
 import { eq, desc, and } from 'drizzle-orm';
-import { getCurrentUser } from '@/lib/auth';
+import { getCurrentUser } from '@/lib/auth-utils';
 
 const VALID_NOTIFICATION_TYPES = [
   'review_requested',
@@ -14,7 +14,7 @@ const VALID_NOTIFICATION_TYPES = [
 
 export async function GET(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
+    const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json(
         { error: 'Authentication required', code: 'UNAUTHORIZED' },
@@ -112,8 +112,8 @@ export async function POST(request: NextRequest) {
 
     const targetUser = await db
       .select()
-      .from(user)
-      .where(eq(user.id, userId))
+      .from(users)
+      .where(eq(users.id, userId))
       .limit(1);
 
     if (targetUser.length === 0) {
