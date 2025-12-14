@@ -236,78 +236,76 @@ export async function DELETE(
       return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
     }
 
-  }
-
     const { id } = await params;
-  const cycleId = id;
+    const cycleId = id;
 
-  // Validate ID
-  if (!cycleId || isNaN(parseInt(cycleId))) {
-    return NextResponse.json(
-      { error: 'Valid cycle ID is required', code: 'INVALID_ID' },
-      { status: 400 }
-    );
-  }
+    // Validate ID
+    if (!cycleId || isNaN(parseInt(cycleId))) {
+      return NextResponse.json(
+        { error: 'Valid cycle ID is required', code: 'INVALID_ID' },
+        { status: 400 }
+      );
+    }
 
-  // Check if cycle exists
-  const existingCycle = await db
-    .select()
-    .from(reviewCycles)
-    .where(eq(reviewCycles.id, parseInt(cycleId)))
-    .limit(1);
+    // Check if cycle exists
+    const existingCycle = await db
+      .select()
+      .from(reviewCycles)
+      .where(eq(reviewCycles.id, parseInt(cycleId)))
+      .limit(1);
 
-  if (existingCycle.length === 0) {
-    return NextResponse.json(
-      { error: 'Review cycle not found', code: 'CYCLE_NOT_FOUND' },
-      { status: 404 }
-    );
-  }
+    if (existingCycle.length === 0) {
+      return NextResponse.json(
+        { error: 'Review cycle not found', code: 'CYCLE_NOT_FOUND' },
+        { status: 404 }
+      );
+    }
 
-  // Check if cycle has submitted forms
-  const submittedForms = await db
-    .select({ count: count() })
-    .from(reviewForms)
-    .where(
-      and(
-        eq(reviewForms.cycleId, parseInt(cycleId)),
-        eq(reviewForms.status, 'submitted')
-      )
-    );
+    // Check if cycle has submitted forms
+    const submittedForms = await db
+      .select({ count: count() })
+      .from(reviewForms)
+      .where(
+        and(
+          eq(reviewForms.cycleId, parseInt(cycleId)),
+          eq(reviewForms.status, 'submitted')
+        )
+      );
 
-  if (submittedForms[0].count > 0) {
+    if (submittedForms[0].count > 0) {
+      return NextResponse.json(
+        {
+          error: 'Cannot delete cycle with submitted forms',
+          code: 'HAS_SUBMITTED_FORMS',
+          submittedFormsCount: submittedForms[0].count,
+        },
+        { status: 409 }
+      );
+    }
+
+    // Delete all related forms first
+    await db
+      .delete(reviewForms)
+      .where(eq(reviewForms.cycleId, parseInt(cycleId)));
+
+    // Delete the cycle
+    const deleted = await db
+      .delete(reviewCycles)
+      .where(eq(reviewCycles.id, parseInt(cycleId)))
+      .returning();
+
     return NextResponse.json(
       {
-        error: 'Cannot delete cycle with submitted forms',
-        code: 'HAS_SUBMITTED_FORMS',
-        submittedFormsCount: submittedForms[0].count,
+        message: 'Review cycle deleted successfully',
+        cycle: deleted[0],
       },
-      { status: 409 }
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error('DELETE cycle error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error: ' + (error as Error).message },
+      { status: 500 }
     );
   }
-
-  // Delete all related forms first
-  await db
-    .delete(reviewForms)
-    .where(eq(reviewForms.cycleId, parseInt(cycleId)));
-
-  // Delete the cycle
-  const deleted = await db
-    .delete(reviewCycles)
-    .where(eq(reviewCycles.id, parseInt(cycleId)))
-    .returning();
-
-  return NextResponse.json(
-    {
-      message: 'Review cycle deleted successfully',
-      cycle: deleted[0],
-    },
-    { status: 200 }
-  );
-} catch (error) {
-  console.error('DELETE cycle error:', error);
-  return NextResponse.json(
-    { error: 'Internal server error: ' + (error as Error).message },
-    { status: 500 }
-  );
-}
 }
